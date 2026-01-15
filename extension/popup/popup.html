@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Multi-LLM Dispatcher</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="container">
+    <!-- 头部 -->
+    <header class="header">
+      <div class="logo">
+        <span class="logo-icon">🚀</span>
+        <h1>Multi-LLM Dispatcher</h1>
+      </div>
+      <p class="subtitle">一次输入，多模型并行发送</p>
+    </header>
+
+    <!-- 目标选择区域 -->
+    <section class="targets-section">
+      <div class="section-header">
+        <h2>目标模型</h2>
+        <button id="refreshBtn" class="icon-btn" title="刷新">
+          <span>🔄</span>
+        </button>
+      </div>
+      
+      <div id="targetsList" class="targets-list">
+        <div class="loading">
+          <span class="spinner"></span>
+          <span>扫描中...</span>
+        </div>
+      </div>
+
+      <div id="noTargets" class="no-targets" style="display: none;">
+        <span class="empty-icon">📭</span>
+        <p>未检测到 LLM 页面</p>
+        <p class="hint">请打开 ChatGPT、Claude 或 Gemini 页面</p>
+      </div>
+    </section>
+
+    <!-- Prompt 输入区域 -->
+    <section class="prompt-section">
+      <h2>Prompt</h2>
+      <div class="textarea-wrapper">
+        <textarea 
+          id="promptInput" 
+          placeholder="输入你的 prompt..."
+          rows="4"
+        ></textarea>
+        <div class="char-count">
+          <span id="charCount">0</span> 字符
+        </div>
+      </div>
+    </section>
+
+    <!-- 发送按钮 -->
+    <section class="action-section">
+      <button id="sendBtn" class="send-btn" disabled>
+        <span class="btn-icon">📤</span>
+        <span class="btn-text">发送到所有选中模型</span>
+      </button>
+    </section>
+
+    <!-- 结果区域 -->
+    <section id="resultsSection" class="results-section" style="display: none;">
+      <h2>发送结果</h2>
+      <div id="resultsList" class="results-list"></div>
+    </section>
+
+    <!-- 底部提示 -->
+    <footer class="footer">
+      <p class="warning">
+        ⚠️ 每个模型使用各自当前的对话上下文
+      </p>
+    </footer>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
