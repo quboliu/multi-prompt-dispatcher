@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Multi-LLM Command Center</title>
+    <link rel="stylesheet" href="dashboard.css">
+</head>
+
+<body>
+    <div class="dashboard-container">
+        <!-- 顶部控制栏 -->
+        <header class="control-bar">
+            <div class="logo-section">
+                <span class="logo-icon">🎛️</span>
+                <h1>Command Center</h1>
+            </div>
+
+            <div class="controls">
+                <!-- 布局选择 -->
+                <div class="layout-selector">
+                    <label>布局:</label>
+                    <select id="layoutSelect">
+                        <option value="1x2">1 × 2</option>
+                        <option value="2x2" selected>2 × 2</option>
+                        <option value="1x3">1 × 3</option>
+                        <option value="3x1">3 × 1</option>
+                    </select>
+                </div>
+
+                <!-- Prompt 输入 -->
+                <button id="showPromptBtn" class="control-btn">
+                    <span>✏️</span> 输入 Prompt
+                </button>
+
+                <!-- 刷新 -->
+                <button id="refreshBtn" class="control-btn">
+                    <span>🔄</span>
+                </button>
+
+                <!-- 全屏 -->
+                <button id="fullscreenBtn" class="control-btn">
+                    <span>⛶</span>
+                </button>
+            </div>
+        </header>
+
+        <!-- Prompt 输入面板（默认隐藏） -->
+        <div id="promptPanel" class="prompt-panel hidden">
+            <div class="prompt-content">
+                <h2>发送 Prompt</h2>
+                <textarea id="promptInput" placeholder="输入你的 prompt..."></textarea>
+                <div class="prompt-actions">
+                    <button id="sendPromptBtn" class="primary-btn">发送到所有模型</button>
+                    <button id="closePromptBtn" class="secondary-btn">取消</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Grid 容器 -->
+        <main id="gridContainer" class="grid-container grid-2x2">
+            <!-- 将由 JS 动态填充 -->
+        </main>
+
+        <!-- 空状态 -->
+        <div id="emptyState" class="empty-state">
+            <span class="empty-icon">🚀</span>
+            <h2>欢迎来到指挥中心</h2>
+            <p>请先打开一些 LLM 页面（ChatGPT、Claude、Gemini）</p>
+            <button id="openPopupBtn" class="primary-btn">打开控制面板</button>
+        </div>
+    </div>
+
+    <script src="dashboard.js"></script>
+</body>
+
+</html>

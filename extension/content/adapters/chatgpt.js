@@ -144,6 +144,147 @@ class ChatGPTAdapter extends BaseAdapter {
             return { success: false, error: error.message };
         }
     }
+
+    // ============ Phase 2: 输出捕获功能 ============
+
+    /**
+     * 获取对话消息容器（包含所有消息）
+     * @returns {HTMLElement|null}
+     */
+    getResponseContainer() {
+        // ChatGPT 的消息容器选择器
+        const selectors = [
+            'main [role="presentation"]',  // 主对话区域
+            'main .flex.flex-col',
+            '.conversation-turn-wrapper',
+            '[data-testid^="conversation-turn"]'
+        ];
+
+        for (const selector of selectors) {
+            const container = document.querySelector(selector);
+            if (container) return container;
+        }
+        return null;
+    }
+
+    /**
+     * 提取最新的助手回答
+     * @returns {object|null} { role: 'assistant', content: string, isGenerating: boolean }
+     */
+    extractLatestResponse() {
+        try {
+            // ChatGPT 的消息以 group 形式组织
+            // 查找所有消息组
+            const messageGroups = document.querySelectorAll('[data-message-author-role]');
+
+            if (messageGroups.length === 0) return null;
+
+            // 从后往前找第一个 assistant 消息
+            for (let i = messageGroups.length - 1; i >= 0; i--) {
+                const group = messageGroups[i];
+                const role = group.getAttribute('data-message-author-role');
+
+                if (role === 'assistant') {
+                    // 提取文本内容
+                    const contentElement = group.querySelector('.markdown, [data-message-id]');
+                    if (!contentElement) continue;
+
+                    const content = contentElement.innerText || contentElement.textContent || '';
+
+                    // 检查是否正在生成
+                    const isGenerating = this.isGenerating();
+
+                    return {
+                        role: 'assistant',
+                        content: content.trim(),
+                        isGenerating: isGenerating,
+                        html: contentElement.innerHTML,
+                        timestamp: Date.now()
+                    };
+                }
+            }
+
+            return null;
+        } catch (error) {
+            console.error('[ChatGPT Adapter] Error extracting response:', error);
+            return null;
+        }
+    }
+
+    /**
+     * 检查是否正在生成
+     * @returns {boolean}
+     */
+    isGenerating() {
+        // 检查停止按钮是否存在
+        const stopButton = document.querySelector('[data-testid="stop-button"]');
+        if (stopButton) return true;
+
+        // 检查是否有生成指示器
+        const generatingIndicators = document.querySelectorAll('.result-streaming, [data-is-streaming="true"]');
+        if (generatingIndicators.length > 0) return true;
+
+        return false;
+    }
+
+    /**
+     * 开始监听输出变化
+     * @param {Function} callback - 回调函数，接收 response 对象
+     * @returns {MutationObserver}
+     */
+    startObserving(callback) {
+        const container = this.getResponseContainer();
+        if (!container) {
+            console.error('[ChatGPT Adapter] Response container not found');
+            return null;
+        }
+
+        let lastContent = '';
+        let pendingUpdate = false;
+
+        // 使用 requestAnimationFrame 进行高性能更新
+        const processUpdate = () => {
+            pendingUpdate = false;
+
+            const response = this.extractLatestResponse();
+            if (!response) return;
+
+            // 仅在内容变化时触发回调
+            if (response.content !== lastContent) {
+                lastContent = response.content;
+                callback(response);
+            }
+        };
+
+        const observer = new MutationObserver((mutations) => {
+            // 如果已经有待处理的更新，跳过
+            if (pendingUpdate) return;
+
+            // 使用 requestAnimationFrame 确保流畅更新
+            pendingUpdate = true;
+            requestAnimationFrame(processUpdate);
+        });
+
+        observer.observe(container, {
+            childList: true,
+            subtree: true,
+            characterData: true
+        });
+
+        console.log('[ChatGPT Adapter] Started observing responses');
+        return observer;
+    }
+
+    /**
+     * 停止监听
+     * @param {MutationObserver} observer
+     */
+    stopObserving(observer) {
+        if (observer) {
+            observer.disconnect();
+            console.log('[ChatGPT Adapter] Stopped observing');
+        }
+    }
 }
 
 // 注册适配器

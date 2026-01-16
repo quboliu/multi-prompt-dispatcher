@@ -1,11 +1,13 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Multi-LLM Dispatcher</title>
   <link rel="stylesheet" href="popup.css">
 </head>
+
 <body>
   <div class="container">
     <!-- 头部 -->
@@ -25,7 +27,7 @@
           <span>🔄</span>
         </button>
       </div>
-      
+
       <div id="targetsList" class="targets-list">
         <div class="loading">
           <span class="spinner"></span>
@@ -44,11 +46,7 @@
     <section class="prompt-section">
       <h2>Prompt</h2>
       <div class="textarea-wrapper">
-        <textarea 
-          id="promptInput" 
-          placeholder="输入你的 prompt..."
-          rows="4"
-        ></textarea>
+        <textarea id="promptInput" placeholder="输入你的 prompt..." rows="4"></textarea>
         <div class="char-count">
           <span id="charCount">0</span> 字符
         </div>
@@ -60,6 +58,10 @@
       <button id="sendBtn" class="send-btn" disabled>
         <span class="btn-icon">📤</span>
         <span class="btn-text">发送到所有选中模型</span>
+      </button>
+      <button id="dashboardBtn" class="dashboard-btn">
+        <span>🎛️</span>
+        <span>打开指挥中心</span>
       </button>
     </section>
 
@@ -79,4 +81,5 @@
 
   <script src="popup.js"></script>
 </body>
+
 </html>

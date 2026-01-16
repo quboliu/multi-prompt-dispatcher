@@ -32,14 +32,43 @@
         "https://chat.openai.com/*",
         "https://chatgpt.com/*"
       ],
-      "js": ["content/adapters/base.js", "content/adapters/chatgpt.js", "content/content.js"],
+      "js": [
+        "content/adapters/base.js",
+        "content/adapters/chatgpt.js",
+        "content/content.js"
+      ],
+      "run_at": "document_idle",
+      "world": "MAIN"
+    },
+    {
+      "matches": [
+        "https://chat.openai.com/*",
+        "https://chatgpt.com/*"
+      ],
+      "js": [
+        "content/bridge.js"
+      ],
       "run_at": "document_idle"
     },
     {
       "matches": [
         "https://claude.ai/*"
       ],
-      "js": ["content/adapters/base.js", "content/adapters/claude.js", "content/content.js"],
+      "js": [
+        "content/adapters/base.js",
+        "content/adapters/claude.js",
+        "content/content.js"
+      ],
+      "run_at": "document_idle",
+      "world": "MAIN"
+    },
+    {
+      "matches": [
+        "https://claude.ai/*"
+      ],
+      "js": [
+        "content/bridge.js"
+      ],
       "run_at": "document_idle"
     },
     {
@@ -47,7 +76,22 @@
         "https://gemini.google.com/*",
         "https://aistudio.google.com/*"
       ],
-      "js": ["content/adapters/base.js", "content/adapters/gemini.js", "content/content.js"],
+      "js": [
+        "content/adapters/base.js",
+        "content/adapters/gemini.js",
+        "content/content.js"
+      ],
+      "run_at": "document_idle",
+      "world": "MAIN"
+    },
+    {
+      "matches": [
+        "https://gemini.google.com/*",
+        "https://aistudio.google.com/*"
+      ],
+      "js": [
+        "content/bridge.js"
+      ],
       "run_at": "document_idle"
     }
   ],
@@ -55,5 +99,19 @@
     "16": "icons/icon16.png",
     "48": "icons/icon48.png",
     "128": "icons/icon128.png"
+  },
+  "commands": {
+    "_execute_action": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+M"
+      }
+    },
+    "open-dashboard": {
+      "suggested_key": {
+        "default": "Alt+Shift+D",
+        "mac": "MacCtrl+Shift+D"
+      },
+      "description": "打开指挥中心 Dashboard"
+    }
   }
 }

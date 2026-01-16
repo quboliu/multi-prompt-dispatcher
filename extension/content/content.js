@@ -1,6 +1,6 @@
 /**
- * Content Script 主入口
- * 负责与 Background Script 通信，执行适配器操作
+ * Content Script 主入口 - 运行在 MAIN 世界
+ * 负责执行适配器操作，通过 postMessage 与 Bridge 通信
  */
 
 (function () {
@@ -22,94 +22,145 @@
 
     console.log(`[MultiLLM] Loaded ${adapter.displayName} adapter`);
 
-    /**
-     * 处理来自 Background/Popup 的消息
-     */
-    chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-        console.log('[MultiLLM] Received message:', message);
-
-        switch (message.type) {
-            case 'PING':
-                // 心跳检测，返回适配器状态
-                sendResponse({
-                    success: true,
-                    data: adapter.getStatus()
-                });
-                break;
-
-            case 'GET_STATUS':
-                // 获取详细状态
-                sendResponse({
-                    success: true,
-                    data: adapter.getStatus()
-                });
-                break;
-
-            case 'SEND_PROMPT':
-                // 发送 prompt
-                handleSendPrompt(message.prompt)
-                    .then(result => {
-                        sendResponse(result);
-                    })
-                    .catch(error => {
-                        sendResponse({
-                            success: false,
-                            error: error.message
-                        });
-                    });
-                // 返回 true 表示将异步发送响应
-                return true;
-
-            default:
-                sendResponse({
-                    success: false,
-                    error: `Unknown message type: ${message.type}`
-                });
-        }
-    });
+    // ============ 与 Bridge 通信 ============
 
     /**
-     * 处理发送 prompt 请求
-     * @param {string} prompt 
-     * @returns {Promise<object>}
+     * 发送消息到 Bridge（然后转发到 Background）
      */
-    async function handleSendPrompt(prompt) {
-        if (!prompt || typeof prompt !== 'string') {
-            return { success: false, error: '无效的 prompt' };
-        }
-
-        console.log(`[MultiLLM] Sending prompt to ${adapter.displayName}:`, prompt.substring(0, 50) + '...');
-
-        const result = await adapter.sendPrompt(prompt);
-
-        console.log(`[MultiLLM] Send result for ${adapter.displayName}:`, result);
-
-        return {
-            ...result,
-            platform: adapter.name,
-            displayName: adapter.displayName
-        };
+    function sendToBridge(type, data) {
+        window.postMessage({
+            source: 'MULTILLM_MAIN',
+            type: type,
+            data: data,
+            requestId: Date.now() + Math.random()
+        }, '*');
     }
 
     /**
-     * 初始化：通知 Background Script 此页面已就绪
+     * 监听来自 Bridge 的消息（来自 Background）
      */
-    function notifyReady() {
-        try {
-            chrome.runtime.sendMessage({
-                type: 'CONTENT_READY',
-                data: adapter.getStatus()
-            });
-        } catch (e) {
-            // 可能在无效上下文中，忽略
+    window.addEventListener('message', async (event) => {
+        if (event.source !== window) return;
+
+        const message = event.data;
+        if (!message || message.source !== 'MULTILLM_BACKGROUND') return;
+
+        console.log('[MultiLLM] Received from Bridge:', message.type);
+
+        let response = { success: true };
+
+        switch (message.type) {
+            case 'PING':
+            case 'GET_STATUS':
+                response = {
+                    success: true,
+                    data: adapter.getStatus()
+                };
+                break;
+
+            case 'SEND_PROMPT':
+                try {
+                    const result = await adapter.sendPrompt(message.data?.prompt || message.prompt);
+                    response = {
+                        ...result,
+                        platform: adapter.name,
+                        displayName: adapter.displayName
+                    };
+                } catch (error) {
+                    response = { success: false, error: error.message };
+                }
+                break;
+
+            case 'START_OBSERVING':
+                startResponseObserving();
+                response = { success: true };
+                break;
+
+            case 'STOP_OBSERVING':
+                stopResponseObserving();
+                response = { success: true };
+                break;
+
+            case 'GET_LATEST_RESPONSE':
+                if (typeof adapter.extractLatestResponse === 'function') {
+                    response = { success: true, response: adapter.extractLatestResponse() };
+                } else {
+                    response = { success: false, error: 'Not supported' };
+                }
+                break;
         }
+
+        // 发送响应回 Bridge
+        window.postMessage({
+            source: 'MULTILLM_MAIN_RESPONSE',
+            requestType: message.type,
+            response: response
+        }, '*');
+    });
+
+    // ============ Phase 2: 输出监听功能 ============
+
+    let responseObserver = null;
+    let isObserving = false;
+
+    /**
+     * 启动输出监听
+     */
+    function startResponseObserving() {
+        if (isObserving) {
+            console.log('[MultiLLM] Already observing');
+            return;
+        }
+
+        // 检查适配器是否支持监听
+        if (typeof adapter.startObserving !== 'function') {
+            console.warn('[MultiLLM] Adapter does not support response observing');
+            return;
+        }
+
+        responseObserver = adapter.startObserving((response) => {
+            // 通过 Bridge 广播响应更新
+            sendToBridge('RESPONSE_UPDATE', {
+                platform: adapter.name,
+                displayName: adapter.displayName,
+                icon: adapter.icon,
+                response: response
+            });
+        });
+
+        if (responseObserver) {
+            isObserving = true;
+            console.log(`[MultiLLM] Started observing ${adapter.displayName} responses`);
+        }
+    }
+
+    /**
+     * 停止输出监听
+     */
+    function stopResponseObserving() {
+        if (!isObserving || !responseObserver) return;
+
+        if (typeof adapter.stopObserving === 'function') {
+            adapter.stopObserving(responseObserver);
+        }
+
+        responseObserver = null;
+        isObserving = false;
+        console.log(`[MultiLLM] Stopped observing ${adapter.displayName} responses`);
+    }
+
+    // ============ 初始化 ============
+
+    // 通知 Bridge 此页面已就绪（通过 postMessage）
+    function notifyReady() {
+        sendToBridge('CONTENT_READY', adapter.getStatus());
     }
 
     // 页面加载完成后通知
     if (document.readyState === 'complete') {
-        notifyReady();
+        setTimeout(notifyReady, 100); // 稍微延迟确保 Bridge 已加载
     } else {
-        window.addEventListener('load', notifyReady);
+        window.addEventListener('load', () => setTimeout(notifyReady, 100));
     }
 
     // 监听页面可见性变化
@@ -118,5 +169,8 @@
             notifyReady();
         }
     });
+
+    // 自动启动监听（可选）
+    // setTimeout(startResponseObserving, 500);
 
 })();

@@ -13,6 +13,7 @@
     const refreshBtn = document.getElementById('refreshBtn');
     const resultsSection = document.getElementById('resultsSection');
     const resultsList = document.getElementById('resultsList');
+    const dashboardBtn = document.getElementById('dashboardBtn');
 
     // 状态
     let availableTabs = [];
@@ -30,6 +31,13 @@
         sendBtn.addEventListener('click', sendToAll);
         promptInput.addEventListener('input', updateCharCount);
         promptInput.addEventListener('input', updateSendButton);
+
+        // 打开 Dashboard
+        dashboardBtn.addEventListener('click', () => {
+            chrome.tabs.create({
+                url: chrome.runtime.getURL('dashboard/dashboard.html')
+            });
+        });
     }
 
     // 扫描 LLM 标签页

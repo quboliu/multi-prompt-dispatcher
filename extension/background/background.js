@@ -165,10 +165,69 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             sendResponse({ success: true });
             break;
 
+        case 'RESPONSE_UPDATE':
+            // Phase 2: Content Script 广播响应更新
+            if (sender.tab) {
+                const data = {
+                    ...message.data,
+                    tabId: sender.tab.id
+                };
+
+                // 广播给所有 Dashboard 页面
+                broadcastToDashboards('RESPONSE_UPDATE', data);
+            }
+            sendResponse({ success: true });
+            break;
+
+        case 'START_OBSERVING_TAB':
+            // Phase 2: Dashboard 请求启动某个 Tab 的监听
+            if (message.tabId) {
+                sendMessageToTab(message.tabId, { type: 'START_OBSERVING' })
+                    .then(() => sendResponse({ success: true }))
+                    .catch(error => sendResponse({ success: false, error: error.message }));
+                return true;
+            }
+            break;
+
+        case 'STOP_OBSERVING_TAB':
+            // Phase 2: Dashboard 请求停止某个 Tab 的监听
+            if (message.tabId) {
+                sendMessageToTab(message.tabId, { type: 'STOP_OBSERVING' })
+                    .then(() => sendResponse({ success: true }))
+                    .catch(error => sendResponse({ success: false, error: error.message }));
+                return true;
+            }
+            break;
+
         default:
             sendResponse({ success: false, error: 'Unknown message type' });
     }
 });
+
+/**
+ * Phase 2: 广播消息到所有 Dashboard 页面
+ * @param {string} type 
+ * @param {object} data 
+ */
+async function broadcastToDashboards(type, data) {
+    try {
+        // 获取所有扩展页面（Manifest V3 方式）
+        const extensionUrl = chrome.runtime.getURL('dashboard/dashboard.html');
+        const tabs = await chrome.tabs.query({ url: extensionUrl });
+
+        for (const tab of tabs) {
+            // 使用 chrome.tabs.sendMessage 发送消息
+            chrome.tabs.sendMessage(tab.id, { type, data }).catch(() => {
+                // 忽略错误（页面可能正在加载）
+            });
+        }
+
+        console.log(`[Background] Broadcast ${type} to ${tabs.length} dashboard(s)`);
+    } catch (error) {
+        console.error('[Background] Error broadcasting to dashboards:', error);
+    }
+}
+
 
 /**
  * 监听标签页关闭事件，清理状态
@@ -190,3 +249,15 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
 });
 
 console.log('[Background] Service worker initialized');
+
+/**
+ * Phase 2: 监听快捷键命令
+ */
+chrome.commands.onCommand.addListener((command) => {
+    if (command === 'open-dashboard') {
+        // 打开 Dashboard 页面
+        chrome.tabs.create({
+            url: chrome.runtime.getURL('dashboard/dashboard.html')
+        });
+    }
+});
