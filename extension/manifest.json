@@ -33,6 +33,17 @@
         "https://chatgpt.com/*"
       ],
       "js": [
+        "content/network-interceptor.js"
+      ],
+      "run_at": "document_start",
+      "world": "MAIN"
+    },
+    {
+      "matches": [
+        "https://chat.openai.com/*",
+        "https://chatgpt.com/*"
+      ],
+      "js": [
         "content/adapters/base.js",
         "content/adapters/chatgpt.js",
         "content/content.js"

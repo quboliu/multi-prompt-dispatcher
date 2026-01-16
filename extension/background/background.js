@@ -13,6 +13,9 @@ const SUPPORTED_PATTERNS = [
 // 存储活跃的 LLM 标签页状态
 const tabStates = new Map();
 
+// Phase 2: 缓存各标签页的最新响应（避免后台标签页延迟问题）
+const responseCache = new Map(); // tabId -> { response, timestamp }
+
 /**
  * 检查 URL 是否匹配支持的平台
  * @param {string} url 
@@ -168,10 +171,20 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         case 'RESPONSE_UPDATE':
             // Phase 2: Content Script 广播响应更新
             if (sender.tab) {
+                const tabId = sender.tab.id;
                 const data = {
                     ...message.data,
-                    tabId: sender.tab.id
+                    tabId: tabId
                 };
+
+                // 缓存响应数据（关键！）
+                responseCache.set(tabId, {
+                    response: message.data.response,
+                    platform: message.data.platform,
+                    displayName: message.data.displayName,
+                    icon: message.data.icon,
+                    timestamp: Date.now()
+                });
 
                 // 广播给所有 Dashboard 页面
                 broadcastToDashboards('RESPONSE_UPDATE', data);
@@ -196,6 +209,20 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                     .then(() => sendResponse({ success: true }))
                     .catch(error => sendResponse({ success: false, error: error.message }));
                 return true;
+            }
+            break;
+
+        case 'GET_LATEST_RESPONSE_FROM_TAB':
+            // Phase 2: Dashboard 主动拉取最新响应（从缓存返回，不需要问后台标签页）
+            if (message.tabId) {
+                const cached = responseCache.get(message.tabId);
+                if (cached) {
+                    sendResponse({ success: true, response: cached.response });
+                } else {
+                    sendResponse({ success: false, error: 'No cached response' });
+                }
+            } else {
+                sendResponse({ success: false, error: 'No tabId' });
             }
             break;
 

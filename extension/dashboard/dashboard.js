@@ -47,6 +47,8 @@
                 activeTabs = response.tabs;
                 renderGrid();
                 startObservingAll();
+                // 不再使用轮询，改用网络拦截推送
+                // startPolling();
             }
         } catch (error) {
             console.error('[Dashboard] Scan failed:', error);
@@ -117,6 +119,58 @@
         }
     }
 
+    // ============ 主动轮询机制 ============
+    let pollingIntervalId = null;
+
+    // 启动主动轮询
+    function startPolling() {
+        // 停止之前的轮询
+        if (pollingIntervalId) {
+            clearInterval(pollingIntervalId);
+        }
+
+        // 每 100ms 轮询一次
+        pollingIntervalId = setInterval(pollLatestResponses, 100);
+        console.log('[Dashboard] Started polling');
+    }
+
+    // 轮询获取最新响应 - 使用 chrome.scripting.executeScript 直接获取
+    async function pollLatestResponses() {
+        for (const tab of activeTabs) {
+            try {
+                // 直接在目标页面的 MAIN 世界执行脚本获取数据
+                const results = await chrome.scripting.executeScript({
+                    target: { tabId: tab.tabId },
+                    world: 'MAIN',  // 关键！在 MAIN 世界执行才能访问 window.currentAdapter
+                    func: () => {
+                        // 这个函数在目标页面的 MAIN 世界执行
+                        if (window.currentAdapter && typeof window.currentAdapter.extractLatestResponse === 'function') {
+                            return window.currentAdapter.extractLatestResponse();
+                        }
+                        return null;
+                    }
+                });
+
+                if (results && results[0] && results[0].result) {
+                    handleResponseUpdate({
+                        tabId: tab.tabId,
+                        response: results[0].result
+                    });
+                }
+            } catch (error) {
+                // 忽略错误（可能是权限问题或页面未加载完成）
+                console.log('[Dashboard] Poll error for tab', tab.tabId, error.message);
+            }
+        }
+    }
+
+    // 停止轮询（页面关闭时）
+    window.addEventListener('beforeunload', () => {
+        if (pollingIntervalId) {
+            clearInterval(pollingIntervalId);
+        }
+    });
+
     // 监听来自 Background 的广播
     function setupMessageListener() {
         // 使用 chrome.runtime.onMessage 接收消息
@@ -131,56 +185,48 @@
         });
     }
 
-    // 处理响应更新
-    // 待处理的更新队列
-    const pendingUpdates = new Map();
-    let updateScheduled = false;
-
-    // 批量处理更新
-    function flushUpdates() {
-        updateScheduled = false;
-
-        for (const [tabId, response] of pendingUpdates) {
-            const card = modelCards.get(tabId);
-            if (!card) continue;
-
-            const statusEl = card.querySelector('.card-status');
-            const contentEl = card.querySelector('.response-text');
-
-            if (response.isGenerating) {
-                card.classList.add('generating');
-                statusEl.textContent = '生成中...';
-                statusEl.classList.add('status-generating');
-            } else {
-                card.classList.remove('generating');
-                statusEl.textContent = '已完成';
-                statusEl.classList.remove('status-generating');
-            }
-
-            // 渲染内容
-            contentEl.textContent = response.content || '(空)';
-
-            // 自动滚动到底部
-            contentEl.scrollTop = contentEl.scrollHeight;
-        }
-
-        pendingUpdates.clear();
-    }
-
-    // 处理响应更新
+    // 处理响应更新 - 直接同步更新，确保实时性
     function handleResponseUpdate(data) {
         const { tabId, response } = data;
+
+        if (!response) return;
+
+        // 检查内容是否真正变化
+        const oldData = responseData.get(tabId);
+        if (oldData && oldData.content === response.content && oldData.isGenerating === response.isGenerating) {
+            return; // 内容没变，不更新
+        }
 
         // 更新数据
         responseData.set(tabId, response);
 
-        // 添加到待处理队列
-        pendingUpdates.set(tabId, response);
+        // 直接更新 UI
+        const card = modelCards.get(tabId);
+        if (!card) return;
 
-        // 调度下一帧更新
-        if (!updateScheduled) {
-            updateScheduled = true;
-            requestAnimationFrame(flushUpdates);
+        const statusEl = card.querySelector('.card-status');
+        const contentEl = card.querySelector('.response-text');
+
+        if (response.isGenerating) {
+            card.classList.add('generating');
+            statusEl.textContent = '生成中...';
+            statusEl.classList.add('status-generating');
+        } else {
+            card.classList.remove('generating');
+            statusEl.textContent = '已完成';
+            statusEl.classList.remove('status-generating');
+        }
+
+        // 只在内容变化时更新
+        const newContent = response.content || '(空)';
+        if (contentEl.textContent !== newContent) {
+            contentEl.textContent = newContent;
+        }
+
+        // 自动滚动到底部
+        const cardContent = card.querySelector('.card-content');
+        if (cardContent) {
+            cardContent.scrollTop = cardContent.scrollHeight;
         }
     }
 

@@ -8,30 +8,65 @@
 
     console.log('[MultiLLM Bridge] Initialized');
 
-    // 监听来自 MAIN 世界的消息
+    // 监听来自 MAIN 世界的消息（包括适配器和网络拦截器）
     window.addEventListener('message', (event) => {
         // 只处理来自当前页面的消息
         if (event.source !== window) return;
 
         const message = event.data;
 
-        // 只处理我们的消息
+        // 处理来自网络拦截器的消息
+        if (message && message.source === 'MULTILLM_NETWORK') {
+            console.log('[Bridge] Received from Network Interceptor:', message.type);
+
+            // 将网络拦截器的更新转发给 Background
+            try {
+                chrome.runtime.sendMessage({
+                    type: 'RESPONSE_UPDATE',
+                    data: {
+                        response: message.data,
+                        platform: 'chatgpt',
+                        displayName: 'ChatGPT',
+                        icon: '💚',
+                        source: 'network'
+                    }
+                }, (response) => {
+                    if (chrome.runtime.lastError) {
+                        console.error('[Bridge] Network update error:', chrome.runtime.lastError);
+                    }
+                });
+            } catch (error) {
+                console.error('[Bridge] Network update exception:', error);
+            }
+            return;
+        }
+
+        // 只处理来自适配器的消息
         if (!message || message.source !== 'MULTILLM_MAIN') return;
 
         console.log('[Bridge] Received from MAIN:', message.type);
 
-        // 转发给 Background
-        chrome.runtime.sendMessage({
-            type: message.type,
-            data: message.data
-        }, (response) => {
-            // 将响应发回 MAIN 世界
-            window.postMessage({
-                source: 'MULTILLM_ISOLATED',
-                requestId: message.requestId,
-                response: response
-            }, '*');
-        });
+        // 立即转发给 Background（不延迟）
+        try {
+            chrome.runtime.sendMessage({
+                type: message.type,
+                data: message.data
+            }, (response) => {
+                if (chrome.runtime.lastError) {
+                    console.error('[Bridge] Error sending to Background:', chrome.runtime.lastError);
+                } else {
+                    console.log('[Bridge] Sent to Background successfully:', message.type);
+                }
+                // 将响应发回 MAIN 世界
+                window.postMessage({
+                    source: 'MULTILLM_ISOLATED',
+                    requestId: message.requestId,
+                    response: response
+                }, '*');
+            });
+        } catch (error) {
+            console.error('[Bridge] Exception sending to Background:', error);
+        }
     });
 
     // 监听来自 Background 的消息

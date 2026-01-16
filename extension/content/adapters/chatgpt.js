@@ -240,29 +240,27 @@ class ChatGPTAdapter extends BaseAdapter {
         }
 
         let lastContent = '';
-        let pendingUpdate = false;
-
-        // 使用 requestAnimationFrame 进行高性能更新
-        const processUpdate = () => {
-            pendingUpdate = false;
-
-            const response = this.extractLatestResponse();
-            if (!response) return;
-
-            // 仅在内容变化时触发回调
-            if (response.content !== lastContent) {
-                lastContent = response.content;
-                callback(response);
-            }
-        };
+        let timeoutId = null;
 
         const observer = new MutationObserver((mutations) => {
-            // 如果已经有待处理的更新，跳过
-            if (pendingUpdate) return;
+            // 使用短延迟合并多次 DOM 变化，但确保后台也能执行
+            if (timeoutId) {
+                clearTimeout(timeoutId);
+            }
 
-            // 使用 requestAnimationFrame 确保流畅更新
-            pendingUpdate = true;
-            requestAnimationFrame(processUpdate);
+            // setTimeout(0) 在后台标签页中也能正常工作
+            timeoutId = setTimeout(() => {
+                timeoutId = null;
+
+                const response = this.extractLatestResponse();
+                if (!response) return;
+
+                // 仅在内容变化时触发回调
+                if (response.content !== lastContent) {
+                    lastContent = response.content;
+                    callback(response);
+                }
+            }, 0);
         });
 
         observer.observe(container, {
