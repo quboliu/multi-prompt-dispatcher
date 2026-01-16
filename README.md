@@ -2,25 +2,45 @@
 
 🚀 **一次输入，多模型网页端并行发送 Prompt**
 
-一款 Chrome 浏览器扩展，让你可以同时向多个 AI 模型（ChatGPT、Claude、Gemini）发送相同的 Prompt，告别重复复制粘贴。
+一款 Chrome/Brave 浏览器扩展，让你可以同时向多个 AI 模型发送相同的 Prompt，告别重复复制粘贴。支持 10+ 主流 LLM 平台。
 
 ## ✨ 功能特性
 
-### Phase 1（当前版本）
+### Phase 1（基础功能）
 
 - ✅ **统一 Prompt 输入** - 在一个界面输入，发送到多个模型
-- ✅ **自动检测 LLM 页面** - 自动识别已打开的 ChatGPT、Claude、Gemini 页面
+- ✅ **自动检测 LLM 页面** - 自动识别已打开的 LLM 页面
 - ✅ **多模型并行发送** - 同时向所有选中的模型发送 Prompt
 - ✅ **灵活选择目标** - 可以选择发送到部分模型
 - ✅ **发送状态反馈** - 实时显示每个模型的发送结果
 
+### Phase 2（实时监控）
+
+- ✅ **Shadow Dashboard** - 统一的指挥中心页面
+- ✅ **实时流式输出** - 网络层拦截，实时显示各模型响应
+- ✅ **后台标签页支持** - 无需切换页面即可查看所有模型输出
+
 ### 支持的平台
 
-| 平台 | 支持域名 | 状态 |
-|------|---------|------|
-| 💚 ChatGPT | `chat.openai.com`, `chatgpt.com` | ✅ 支持 |
-| 🧡 Claude | `claude.ai` | ✅ 支持 |
-| 💙 Gemini | `gemini.google.com`, `aistudio.google.com` | ✅ 支持 |
+#### 国际平台
+
+| 平台 | 图标 | 支持域名 | 状态 |
+|------|------|---------|------|
+| ChatGPT | 💚 | `chat.openai.com`, `chatgpt.com` | ✅ 已验证 |
+| Claude | 🧡 | `claude.ai` | ✅ 支持 |
+| Gemini | 💙 | `gemini.google.com`, `aistudio.google.com` | ✅ 支持 |
+| Grok | 🖤 | `grok.x.ai` | 🔄 待验证 |
+
+#### 国内平台
+
+| 平台 | 图标 | 支持域名 | 状态 |
+|------|------|---------|------|
+| DeepSeek | 🔵 | `chat.deepseek.com` | 🔄 待验证 |
+| 通义千问 | 💜 | `tongyi.aliyun.com`, `qianwen.aliyun.com` | 🔄 待验证 |
+| 豆包 | 🟠 | `doubao.com` | 🔄 待验证 |
+| 智谱清言 | 🟢 | `chatglm.cn` | 🔄 待验证 |
+| MiniMax/海螺 | 🐚 | `hailuoai.com` | 🔄 待验证 |
+| Kimi | 🌙 | `kimi.moonshot.cn` | 🔄 待验证 |
 
 ## 📦 安装方法
 

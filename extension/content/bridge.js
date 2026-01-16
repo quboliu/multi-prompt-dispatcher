@@ -20,19 +20,22 @@
             console.log('[Bridge] Received from Network Interceptor:', message.type);
 
             // 将网络拦截器的更新转发给 Background
+            // 使用网络拦截器提供的平台信息
             try {
                 chrome.runtime.sendMessage({
                     type: 'RESPONSE_UPDATE',
                     data: {
                         response: message.data,
-                        platform: 'chatgpt',
-                        displayName: 'ChatGPT',
-                        icon: '💚',
+                        platform: message.data.platform || 'unknown',
+                        displayName: message.data.platformName || 'Unknown',
+                        icon: message.data.platformIcon || '🤖',
                         source: 'network'
                     }
                 }, (response) => {
                     if (chrome.runtime.lastError) {
                         console.error('[Bridge] Network update error:', chrome.runtime.lastError);
+                    } else {
+                        console.log('[Bridge] ✅ Network update forwarded to Background');
                     }
                 });
             } catch (error) {

@@ -1,19 +1,33 @@
 {
   "manifest_version": 3,
   "name": "Multi-LLM Prompt Dispatcher",
-  "version": "1.0.0",
-  "description": "一次输入，多模型网页端并行发送 Prompt",
+  "version": "1.1.0",
+  "description": "一次输入，多模型网页端并行发送 Prompt，支持 ChatGPT、Claude、Gemini、Grok、DeepSeek、通义千问、豆包、智谱清言、MiniMax、Kimi 等",
   "permissions": [
     "activeTab",
     "tabs",
-    "scripting"
+    "scripting",
+    "storage",
+    "sidePanel",
+    "contextMenus"
   ],
   "host_permissions": [
     "https://chat.openai.com/*",
     "https://chatgpt.com/*",
     "https://claude.ai/*",
     "https://gemini.google.com/*",
-    "https://aistudio.google.com/*"
+    "https://aistudio.google.com/*",
+    "https://grok.x.ai/*",
+    "https://x.com/*",
+    "https://chat.deepseek.com/*",
+    "https://tongyi.aliyun.com/*",
+    "https://qianwen.aliyun.com/*",
+    "https://www.doubao.com/*",
+    "https://doubao.com/*",
+    "https://chatglm.cn/*",
+    "https://zhipuai.cn/*",
+    "https://hailuoai.com/*",
+    "https://kimi.moonshot.cn/*"
   ],
   "action": {
     "default_popup": "popup/popup.html",
@@ -23,6 +37,9 @@
       "128": "icons/icon128.png"
     }
   },
+  "side_panel": {
+    "default_path": "popup/popup.html"
+  },
   "background": {
     "service_worker": "background/background.js"
   },
@@ -30,7 +47,20 @@
     {
       "matches": [
         "https://chat.openai.com/*",
-        "https://chatgpt.com/*"
+        "https://chatgpt.com/*",
+        "https://claude.ai/*",
+        "https://gemini.google.com/*",
+        "https://aistudio.google.com/*",
+        "https://grok.x.ai/*",
+        "https://chat.deepseek.com/*",
+        "https://tongyi.aliyun.com/*",
+        "https://qianwen.aliyun.com/*",
+        "https://www.doubao.com/*",
+        "https://doubao.com/*",
+        "https://chatglm.cn/*",
+        "https://zhipuai.cn/*",
+        "https://hailuoai.com/*",
+        "https://kimi.moonshot.cn/*"
       ],
       "js": [
         "content/network-interceptor.js"
@@ -54,7 +84,20 @@
     {
       "matches": [
         "https://chat.openai.com/*",
-        "https://chatgpt.com/*"
+        "https://chatgpt.com/*",
+        "https://claude.ai/*",
+        "https://gemini.google.com/*",
+        "https://aistudio.google.com/*",
+        "https://grok.x.ai/*",
+        "https://chat.deepseek.com/*",
+        "https://tongyi.aliyun.com/*",
+        "https://qianwen.aliyun.com/*",
+        "https://www.doubao.com/*",
+        "https://doubao.com/*",
+        "https://chatglm.cn/*",
+        "https://zhipuai.cn/*",
+        "https://hailuoai.com/*",
+        "https://kimi.moonshot.cn/*"
       ],
       "js": [
         "content/bridge.js"
@@ -75,15 +118,6 @@
     },
     {
       "matches": [
-        "https://claude.ai/*"
-      ],
-      "js": [
-        "content/bridge.js"
-      ],
-      "run_at": "document_idle"
-    },
-    {
-      "matches": [
         "https://gemini.google.com/*",
         "https://aistudio.google.com/*"
       ],
@@ -94,16 +128,6 @@
       ],
       "run_at": "document_idle",
       "world": "MAIN"
-    },
-    {
-      "matches": [
-        "https://gemini.google.com/*",
-        "https://aistudio.google.com/*"
-      ],
-      "js": [
-        "content/bridge.js"
-      ],
-      "run_at": "document_idle"
     }
   ],
   "icons": {

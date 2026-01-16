@@ -9,67 +9,97 @@
 </head>
 
 <body>
-    <div class="dashboard-container">
-        <!-- 顶部控制栏 -->
-        <header class="control-bar">
-            <div class="logo-section">
-                <span class="logo-icon">🎛️</span>
-                <h1>Command Center</h1>
-            </div>
-
-            <div class="controls">
-                <!-- 布局选择 -->
-                <div class="layout-selector">
-                    <label>布局:</label>
-                    <select id="layoutSelect">
-                        <option value="1x2">1 × 2</option>
-                        <option value="2x2" selected>2 × 2</option>
-                        <option value="1x3">1 × 3</option>
-                        <option value="3x1">3 × 1</option>
+    <div id="app-container" class="sidebar-left">
+        <!-- 侧边栏 -->
+        <aside id="sidebar">
+            <div class="sidebar-section settings-section">
+                <h3>Settings</h3>
+                <div class="setting-item">
+                    <label>Position:</label>
+                    <select id="sidebarPosSelect">
+                        <option value="left" selected>Left</option>
+                        <option value="right">Right</option>
+                        <option value="top">Top</option>
+                        <option value="bottom">Bottom</option>
                     </select>
                 </div>
-
-                <!-- Prompt 输入 -->
-                <button id="showPromptBtn" class="control-btn">
-                    <span>✏️</span> 输入 Prompt
-                </button>
-
-                <!-- 刷新 -->
-                <button id="refreshBtn" class="control-btn">
-                    <span>🔄</span>
-                </button>
-
-                <!-- 全屏 -->
-                <button id="fullscreenBtn" class="control-btn">
-                    <span>⛶</span>
-                </button>
-            </div>
-        </header>
-
-        <!-- Prompt 输入面板（默认隐藏） -->
-        <div id="promptPanel" class="prompt-panel hidden">
-            <div class="prompt-content">
-                <h2>发送 Prompt</h2>
-                <textarea id="promptInput" placeholder="输入你的 prompt..."></textarea>
-                <div class="prompt-actions">
-                    <button id="sendPromptBtn" class="primary-btn">发送到所有模型</button>
-                    <button id="closePromptBtn" class="secondary-btn">取消</button>
+                <div class="setting-item">
+                    <label>Card Width (px):</label>
+                    <input type="number" id="cardWidthInput" placeholder="Auto" min="200" step="10">
+                </div>
+                <div class="setting-item">
+                    <label>Card Height (px):</label>
+                    <input type="number" id="cardHeightInput" placeholder="Half Screen" min="200" step="10">
                 </div>
             </div>
-        </div>
 
-        <!-- Grid 容器 -->
-        <main id="gridContainer" class="grid-container grid-2x2">
-            <!-- 将由 JS 动态填充 -->
+            <div class="sidebar-section input-section">
+                <h3>Prompt Input</h3>
+                <textarea id="sidebarPromptInput" placeholder="Enter your prompt here..."></textarea>
+                <div class="input-actions">
+                    <button id="sidebarSendBtn" class="primary-btn">Send to Selected</button>
+                    <div class="selection-info">
+                        <label><input type="checkbox" id="selectAllCheckbox"> Select All</label>
+                    </div>
+                </div>
+            </div>
+
+            <div class="sidebar-section history-section">
+                <h3>History</h3>
+                <div id="historyList" class="history-list">
+                    <!-- History items will be injected here -->
+                </div>
+            </div>
+        </aside>
+
+        <!-- 主内容区 -->
+        <main class="main-content">
+            <div class="dashboard-container">
+                <!-- 顶部控制栏 -->
+                <header class="control-bar">
+                    <div class="logo-section">
+                        <span class="logo-icon">🎛️</span>
+                        <h1>Command Center</h1>
+                    </div>
+
+                    <div class="controls">
+                        <!-- 分组控制 -->
+                        <div class="control-group">
+                            <label>[GROUP BY MODEL]</label>
+                            <input type="checkbox" id="groupToggle">
+                        </div>
+
+                        <!-- 布局选择 -->
+                        <div class="layout-selector">
+                            <label>[LAYOUT]</label>
+                            <select id="layoutSelect">
+                                <option value="1">nx1</option>
+                                <option value="2" selected>nx2</option>
+                                <option value="3">nx3</option>
+                                <option value="4">nx4</option>
+                            </select>
+                        </div>
+
+                        <!-- 刷新 -->
+                        <button id="refreshBtn" class="control-btn"></button>
+
+                        <!-- 全屏 -->
+                        <button id="fullscreenBtn" class="control-btn"></button>
+                    </div>
+                </header>
+
+                <!-- Grid 容器 -->
+                <div id="gridContainer" class="grid-container">
+                    <!-- 将由 JS 动态填充 -->
+                </div>
+
+                <!-- 空状态 -->
+                <div id="emptyState" class="empty-state">
+                    <h2>[ NO ACTIVE MODELS ]</h2>
+                    <p>Please open ChatGPT, Claude, or Gemini tabs.</p>
+                </div>
+            </div>
         </main>
-
-        <!-- 空状态 -->
-        <div id="emptyState" class="empty-state">
-            <span class="empty-icon">🚀</span>
-            <h2>欢迎来到指挥中心</h2>
-            <p>请先打开一些 LLM 页面（ChatGPT、Claude、Gemini）</p>
-            <button id="openPopupBtn" class="primary-btn">打开控制面板</button>
-        </div>
     </div>
 
     <script src="dashboard.js"></script>

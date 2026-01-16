@@ -5,9 +5,19 @@
 
 // 支持的平台 URL 模式
 const SUPPORTED_PATTERNS = [
+    // 国际平台
     { pattern: /^https:\/\/(chat\.openai\.com|chatgpt\.com)/, name: 'chatgpt', displayName: 'ChatGPT', icon: '💚' },
     { pattern: /^https:\/\/claude\.ai/, name: 'claude', displayName: 'Claude', icon: '🧡' },
-    { pattern: /^https:\/\/(gemini\.google\.com|aistudio\.google\.com)/, name: 'gemini', displayName: 'Gemini', icon: '💙' }
+    { pattern: /^https:\/\/(gemini\.google\.com|aistudio\.google\.com)/, name: 'gemini', displayName: 'Gemini', icon: '💙' },
+    { pattern: /^https:\/\/(grok\.x\.ai|x\.com)/, name: 'grok', displayName: 'Grok', icon: '🖤' },
+
+    // 国内平台
+    { pattern: /^https:\/\/chat\.deepseek\.com/, name: 'deepseek', displayName: 'DeepSeek', icon: '🔵' },
+    { pattern: /^https:\/\/(tongyi\.aliyun\.com|qianwen\.aliyun\.com)/, name: 'qwen', displayName: '通义千问', icon: '💜' },
+    { pattern: /^https:\/\/(www\.)?doubao\.com/, name: 'doubao', displayName: '豆包', icon: '🟠' },
+    { pattern: /^https:\/\/(chatglm\.cn|zhipuai\.cn)/, name: 'glm', displayName: '智谱清言', icon: '🟢' },
+    { pattern: /^https:\/\/hailuoai\.com/, name: 'minimax', displayName: 'MiniMax', icon: '🐚' },
+    { pattern: /^https:\/\/kimi\.moonshot\.cn/, name: 'kimi', displayName: 'Kimi', icon: '🌙' }
 ];
 
 // 存储活跃的 LLM 标签页状态
@@ -15,6 +25,13 @@ const tabStates = new Map();
 
 // Phase 2: 缓存各标签页的最新响应（避免后台标签页延迟问题）
 const responseCache = new Map(); // tabId -> { response, timestamp }
+
+// Side Panel 状态跟踪（方案A：内存状态）
+let sidePanelState = {
+    wasOpenBeforeDashboard: false,  // 在打开 dashboard 前是否打开了 side panel
+    lastWindowId: null                // 记录最后操作的窗口 ID
+};
+
 
 /**
  * 检查 URL 是否匹配支持的平台
@@ -69,15 +86,28 @@ async function scanTabs() {
 }
 
 /**
- * 向指定标签页发送消息
+ * 向指定标签页发送消息 (带超时)
  * @param {number} tabId 
  * @param {object} message 
+ * @param {number} timeout 
  * @returns {Promise<object>}
  */
-function sendMessageToTab(tabId, message) {
+function sendMessageToTab(tabId, message, timeout = 5000) {
     return new Promise((resolve, reject) => {
+        let isTimedOut = false;
+
+        const timer = setTimeout(() => {
+            isTimedOut = true;
+            reject(new Error('Request timed out'));
+        }, timeout);
+
         chrome.tabs.sendMessage(tabId, message, (response) => {
+            clearTimeout(timer);
+            if (isTimedOut) return;
+
             if (chrome.runtime.lastError) {
+                // 忽略 "Could not establish connection" 错误，这意味着 content script 还没加载好
+                // 但仍然要 reject 以便调用者知道失败了
                 reject(new Error(chrome.runtime.lastError.message));
             } else {
                 resolve(response);
@@ -141,7 +171,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                     sendResponse({ success: true, tabs });
                 })
                 .catch(error => {
-                    sendResponse({ success: false, error: error.message });
+                    const msg = (error && error.message) ? error.message : String(error);
+                    sendResponse({ success: false, error: msg });
                 });
             return true;
 
@@ -188,6 +219,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
                 // 广播给所有 Dashboard 页面
                 broadcastToDashboards('RESPONSE_UPDATE', data);
+
+                // 广播给所有 Popup/Side Panel 页面
+                broadcastToPopups('RESPONSE_UPDATE', data);
             }
             sendResponse({ success: true });
             break;
@@ -226,6 +260,24 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             }
             break;
 
+        case 'SET_SIDEPANEL_STATE':
+            // Popup 通知 background 即将关闭 side panel
+            if (message.wasOpen !== undefined) {
+                sidePanelState.wasOpenBeforeDashboard = message.wasOpen;
+                sidePanelState.lastWindowId = message.windowId;
+                console.log('[Background] Side panel state updated:', sidePanelState);
+            }
+            sendResponse({ success: true });
+            break;
+
+        case 'CLEAR_SIDEPANEL_STATE':
+            // 用户手动关闭 side panel 时清除状态
+            sidePanelState.wasOpenBeforeDashboard = false;
+            sidePanelState.lastWindowId = null;
+            console.log('[Background] Side panel state cleared');
+            sendResponse({ success: true });
+            break;
+
         default:
             sendResponse({ success: false, error: 'Unknown message type' });
     }
@@ -249,18 +301,120 @@ async function broadcastToDashboards(type, data) {
             });
         }
 
-        console.log(`[Background] Broadcast ${type} to ${tabs.length} dashboard(s)`);
+        console.log(`[Background] Broadcast ${type} to ${tabs.length} dashboard(s):`, tabs.map(t => t.id));
     } catch (error) {
         console.error('[Background] Error broadcasting to dashboards:', error);
     }
 }
 
+/**
+ * 广播消息到所有 Popup/Side Panel 页面
+ * @param {string} type 
+ * @param {object} data 
+ */
+async function broadcastToPopups(type, data) {
+    try {
+        // 获取所有 popup 和 side panel 视图
+        const views = chrome.extension.getViews({ type: 'popup' });
+
+        for (const view of views) {
+            try {
+                // 直接调用 window 的 postMessage 或使用 runtime.sendMessage
+                if (view.chrome && view.chrome.runtime) {
+                    view.chrome.runtime.sendMessage({ type, data }).catch(() => {
+                        // 忽略错误
+                    });
+                }
+            } catch (error) {
+                // 忽略单个视图的错误
+            }
+        }
+
+        console.log(`[Background] Broadcast ${type} to ${views.length} popup(s)`);
+    } catch (error) {
+        console.error('[Background] Error broadcasting to popups:', error);
+    }
+}
 
 /**
  * 监听标签页关闭事件，清理状态
  */
 chrome.tabs.onRemoved.addListener((tabId) => {
     tabStates.delete(tabId);
+});
+
+// 恢复全局默认为启用，确保 Pin 按钮功能正常
+// 然后通过具体的 Tab 逻辑去禁用 Dashboard 页面的侧边栏
+chrome.sidePanel.setOptions({ enabled: true, path: 'popup/popup.html' });
+
+/**
+ * 辅助函数：根据 URL 控制侧边栏显隐
+ */
+async function updateSidePanelState(tabId, url) {
+    if (!url) return;
+
+    // 使用更宽松的匹配
+    if (url.includes('/dashboard/dashboard.html')) {
+        // 在 Dashboard 页面禁用侧边栏
+        console.log(`[SidePanel] Disabling for tab ${tabId} (Dashboard)`);
+        await chrome.sidePanel.setOptions({
+            tabId,
+            enabled: false
+        });
+    } else {
+        // 其他页面显式启用，确保从 Dashboard 切换回来时能恢复
+        await chrome.sidePanel.setOptions({
+            tabId,
+            enabled: true,
+            path: 'popup/popup.html'
+        });
+    }
+}
+
+/**
+ * 初始化：遍历所有标签页设置正确的侧边栏状态
+ */
+async function initSidePanelState() {
+    const tabs = await chrome.tabs.query({});
+    for (const tab of tabs) {
+        if (tab.url) {
+            updateSidePanelState(tab.id, tab.url);
+        }
+    }
+}
+
+// 启动时初始化
+initSidePanelState();
+
+/**
+ * 监听标签页切换
+ */
+chrome.tabs.onActivated.addListener(async (activeInfo) => {
+    try {
+        const tab = await chrome.tabs.get(activeInfo.tabId);
+        if (tab.url) {
+            updateSidePanelState(activeInfo.tabId, tab.url);
+
+            // 自动重新打开 side panel 逻辑
+            const isDashboard = tab.url.includes('/dashboard/dashboard.html');
+
+            if (!isDashboard && sidePanelState.wasOpenBeforeDashboard) {
+                // 不在 dashboard 页面，且之前打开过 side panel
+                // 自动重新打开 side panel
+                console.log('[Background] Auto-reopening side panel for window:', tab.windowId);
+                try {
+                    await chrome.sidePanel.open({ windowId: tab.windowId });
+                    // 重新打开后清除状态
+                    sidePanelState.wasOpenBeforeDashboard = false;
+                    sidePanelState.lastWindowId = null;
+                } catch (error) {
+                    console.error('[Background] Failed to reopen side panel:', error);
+                }
+            }
+        }
+    } catch (e) {
+        // Ignore errors
+    }
 });
 
 /**
@@ -272,6 +426,11 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
         if (!platform) {
             tabStates.delete(tabId);
         }
+    }
+
+    // 即使 changeInfo 中没有 URL，也要检查当前的 tab.url
+    if (tab.url) {
+        updateSidePanelState(tabId, tab.url);
     }
 });
 
@@ -286,5 +445,23 @@ chrome.commands.onCommand.addListener((command) => {
         chrome.tabs.create({
             url: chrome.runtime.getURL('dashboard/dashboard.html')
         });
+    }
+});
+
+/**
+ * 设置右键菜单，允许用户打开侧边栏
+ */
+chrome.runtime.onInstalled.addListener(() => {
+    chrome.contextMenus.create({
+        id: 'openSidePanel',
+        title: 'Open Side Panel',
+        contexts: ['all']
+    });
+});
+
+chrome.contextMenus.onClicked.addListener((info, tab) => {
+    if (info.menuItemId === 'openSidePanel') {
+        // 打开当前标签页的侧边栏
+        chrome.sidePanel.open({ windowId: tab.windowId });
     }
 });

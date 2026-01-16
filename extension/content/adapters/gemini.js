@@ -175,6 +175,87 @@ class GeminiAdapter extends BaseAdapter {
             return { success: false, error: error.message };
         }
     }
+
+    /**
+     * 实现 Phase 2 的响应监听 (作为网络拦截的备份)
+     */
+    startObserving(onUpdate) {
+        let lastText = '';
+        let timeoutId = null;
+
+        const observer = new MutationObserver(() => {
+            if (timeoutId) clearTimeout(timeoutId);
+
+            timeoutId = setTimeout(() => {
+                timeoutId = null;
+                const response = this.extractLatestResponse();
+                if (!response) return;
+
+                if (response.content && response.content !== lastText) {
+                    lastText = response.content;
+                    onUpdate(response);
+                }
+            }, 50);
+        });
+
+        observer.observe(document.body, {
+            childList: true,
+            subtree: true,
+            characterData: true
+        });
+
+        console.log('[Gemini Adapter] Started observing');
+        return observer;
+    }
+
+    /**
+     * 停止监听
+     */
+    stopObserving(observer) {
+        if (observer) {
+            observer.disconnect();
+            console.log('[Gemini Adapter] Stopped observing');
+        }
+    }
+
+    /**
+     * 提取最新响应文本
+     */
+    extractLatestResponse() {
+        const responseElements = document.querySelectorAll('.model-response-text-content, .message-content, [data-test-id="model-response-text"]');
+        if (responseElements.length === 0) return null;
+
+        const lastResponse = responseElements[responseElements.length - 1];
+        const content = lastResponse.innerText.trim();
+
+        return {
+            content: content,
+            isGenerating: this.isGenerating(),
+            role: 'assistant',
+            timestamp: Date.now()
+        };
+    }
+
+    /**
+     * 检查是否正在生成
+     */
+    isGenerating() {
+        // Gemini 的加载指示器选择器
+        const indicators = [
+            '.loading-indicator',
+            '[progress_bar]',
+            'mat-progress-bar',
+            '.generating-text',
+            '.stop-button-container', // 如果有停止按钮
+            '[aria-label="Stop generating"]'
+        ];
+
+        for (const selector of indicators) {
+            if (document.querySelector(selector)) return true;
+        }
+
+        return false;
+    }
 }
 
 // 注册适配器
