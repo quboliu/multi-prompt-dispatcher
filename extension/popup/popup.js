@@ -16,6 +16,7 @@
     const dashboardBtn = document.getElementById('dashboardBtn');
     const pinBtn = document.getElementById('pinBtn');
     const settingsBtn = document.getElementById('settingsBtn');
+    const selectAllBtn = document.getElementById('selectAllBtn');
     const container = document.querySelector('.container');
 
     // 状态
@@ -44,6 +45,7 @@
     // 设置事件监听
     function setupEventListeners() {
         refreshBtn.addEventListener('click', scanTabs);
+        selectAllBtn.addEventListener('click', toggleSelectAll);
         sendBtn.addEventListener('click', sendToAll);
         promptInput.addEventListener('input', updateCharCount);
         promptInput.addEventListener('input', updateSendButton);
@@ -135,7 +137,11 @@
     async function scanTabs() {
         showLoading();
         try {
-            const response = await chrome.runtime.sendMessage({ type: 'SCAN_TABS' });
+            const currentWindow = await chrome.windows.getCurrent();
+            const response = await chrome.runtime.sendMessage({
+                type: 'SCAN_TABS',
+                windowId: currentWindow.id
+            });
             if (response && response.success) {
                 availableTabs = response.tabs || [];
                 renderTargets();
@@ -196,7 +202,12 @@
         }
 
         noTargets.style.display = 'none';
-        selectedTabIds = new Set(availableTabs.map(t => t.tabId));
+
+        // Removed: selectedTabIds = new Set(availableTabs.map(t => t.tabId));
+        // We want them unselected by default as per user request.
+
+        // Update select all button text
+        updateSelectAllButton();
 
         // Get current active tab
         let activeTabId = null;
@@ -216,9 +227,10 @@
         targetsList.innerHTML = availableTabs.map((tab, index) => {
             const newContentCount = newContentTabs.get(tab.tabId) || 0;
             const isActive = tab.tabId === activeTabId;
+            const isSelected = selectedTabIds.has(tab.tabId);
             const isReady = readyStatuses[index];
             return `
-      <div class="target-item selected ${isActive ? 'active-tab' : ''}" data-tab-id="${tab.tabId}">
+      <div class="target-item ${isSelected ? 'selected' : ''} ${isActive ? 'active-tab' : ''}" data-tab-id="${tab.tabId}">
         <div class="target-checkbox"></div>
         <span class="target-icon">${tab.icon}</span>
         <div class="target-info" data-tab-id="${tab.tabId}">
@@ -275,6 +287,36 @@
             item.classList.add('selected');
         }
         updateSendButton();
+        updateSelectAllButton();
+    }
+
+    // Toggle Select All / Deselect All
+    function toggleSelectAll() {
+        if (selectedTabIds.size === availableTabs.length && availableTabs.length > 0) {
+            // All selected, so deselect all
+            selectedTabIds.clear();
+        } else {
+            // Not all selected, so select all
+            selectedTabIds = new Set(availableTabs.map(t => t.tabId));
+        }
+        renderTargets();
+    }
+
+    // Update Select All button text
+    function updateSelectAllButton() {
+        if (!selectAllBtn) return;
+
+        if (availableTabs.length === 0) {
+            selectAllBtn.style.display = 'none';
+            return;
+        }
+
+        selectAllBtn.style.display = 'block';
+        if (selectedTabIds.size === availableTabs.length && availableTabs.length > 0) {
+            selectAllBtn.textContent = '取消全选';
+        } else {
+            selectAllBtn.textContent = '全选';
+        }
     }
 
     // 刷新指定标签页

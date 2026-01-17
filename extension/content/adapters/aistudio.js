@@ -1,18 +1,17 @@
 /**
- * Gemini 适配器
- * 支持 gemini.google.com
+ * Google AI Studio 适配器
+ * 支持 aistudio.google.com
  */
-class GeminiAdapter extends BaseAdapter {
+class AIStudioAdapter extends BaseAdapter {
     constructor() {
         super();
-        this.name = 'gemini';
-        this.displayName = 'Gemini';
-        this.icon = '💙';
+        this.name = 'aistudio';
+        this.displayName = 'Google AI Studio';
+        this.icon = '🛠️';
     }
 
     detect() {
-        const hostname = window.location.hostname;
-        return hostname === 'gemini.google.com';
+        return window.location.hostname === 'aistudio.google.com';
     }
 
     isReady() {
@@ -29,13 +28,12 @@ class GeminiAdapter extends BaseAdapter {
 
     getInputElement() {
         const selectors = [
-            'rich-textarea .ql-editor',
-            'rich-textarea div[contenteditable="true"]',
-            '.input-area-container textarea',
-            'div[contenteditable="true"][aria-label*="prompt"]',
-            'div[contenteditable="true"][data-placeholder]',
-            '.text-input-field textarea',
-            'textarea[placeholder*="Enter"]'
+            'textarea[aria-label="Enter a prompt"]',
+            '.cdk-textarea-autosize.textarea',
+            'textarea[placeholder*="Start typing"]',
+            'textarea[aria-label*="prompt"]',
+            'textarea[placeholder*="Type"]',
+            '.prompt-input textarea'
         ];
 
         for (const selector of selectors) {
@@ -48,12 +46,9 @@ class GeminiAdapter extends BaseAdapter {
 
     getSendButton() {
         const selectors = [
-            'button[aria-label="Send message"]',
-            'button[aria-label*="Submit"]',
-            '.send-button',
-            'button.send-button',
-            'mat-icon-button[aria-label*="Send"]',
-            'button[data-test-id="send-button"]'
+            'button[aria-label="Run"]',
+            '.run-button',
+            'button.primary-button'
         ];
 
         for (const selector of selectors) {
@@ -61,14 +56,11 @@ class GeminiAdapter extends BaseAdapter {
             if (button && !button.disabled) return button;
         }
 
-        // 备用：查找输入区域附近的发送按钮
-        const inputArea = document.querySelector('.input-area, .input-area-container');
-        if (inputArea) {
-            const buttons = inputArea.querySelectorAll('button');
-            for (const btn of buttons) {
-                if (btn.querySelector('svg') || btn.querySelector('mat-icon')) {
-                    return btn;
-                }
+        // 备用：查找包含 "Run" 文本的按钮
+        const allButtons = document.querySelectorAll('button');
+        for (const btn of allButtons) {
+            if (btn.textContent.includes('Run') && (btn.classList.contains('ms-button-primary') || btn.classList.contains('run-button'))) {
+                return btn;
             }
         }
 
@@ -80,16 +72,14 @@ class GeminiAdapter extends BaseAdapter {
         if (!input) return false;
 
         if (input.tagName === 'TEXTAREA') {
-            // 标准 textarea
             input.value = prompt;
             input.dispatchEvent(new Event('input', { bubbles: true }));
             input.dispatchEvent(new Event('change', { bubbles: true }));
-        } else if (input.classList.contains('ql-editor')) {
-            // Quill 编辑器（Gemini 使用）
-            input.innerHTML = `<p>${prompt}</p>`;
-            input.dispatchEvent(new Event('input', { bubbles: true }));
+
+            // AI Studio (Angular) 特需的同步触发
+            input.dispatchEvent(new Event('blur', { bubbles: true }));
+            input.focus();
         } else if (input.contentEditable === 'true') {
-            // 通用 contenteditable
             input.focus();
             input.innerHTML = '';
             const p = document.createElement('p');
@@ -112,17 +102,13 @@ class GeminiAdapter extends BaseAdapter {
                 return { success: false, error: '页面未就绪，可能正在生成回答' };
             }
 
-            // 设置内容
             if (!this.setPrompt(prompt)) {
                 return { success: false, error: '无法设置输入内容' };
             }
 
-            // 等待 UI 响应（Gemini 可能需要更长时间）
             await this.delay(300);
 
-            // 获取发送按钮
             let sendBtn = this.getSendButton();
-
             if (!sendBtn) {
                 await this.delay(300);
                 sendBtn = this.getSendButton();
@@ -139,9 +125,6 @@ class GeminiAdapter extends BaseAdapter {
         }
     }
 
-    /**
-     * 实现 Phase 2 的响应监听 (作为网络拦截的备份)
-     */
     startObserving(onUpdate) {
         let lastText = '';
         let timeoutId = null;
@@ -167,25 +150,19 @@ class GeminiAdapter extends BaseAdapter {
             characterData: true
         });
 
-        console.log('[Gemini Adapter] Started observing');
+        console.log('[AI Studio Adapter] Started observing');
         return observer;
     }
 
-    /**
-     * 停止监听
-     */
     stopObserving(observer) {
         if (observer) {
             observer.disconnect();
-            console.log('[Gemini Adapter] Stopped observing');
+            console.log('[AI Studio Adapter] Stopped observing');
         }
     }
 
-    /**
-     * 提取最新响应文本
-     */
     extractLatestResponse() {
-        const responseElements = document.querySelectorAll('.model-response-text-content, .message-content, [data-test-id="model-response-text"]');
+        const responseElements = document.querySelectorAll('ms-chat-breakpoint, .model-response, ms-prompt-editor .output-content, .response-content');
         if (responseElements.length === 0) return null;
 
         const lastResponse = responseElements[responseElements.length - 1];
@@ -199,19 +176,14 @@ class GeminiAdapter extends BaseAdapter {
         };
     }
 
-    /**
-     * 检查是否正在生成
-     */
     isGenerating() {
-        // Gemini 的加载指示器选择器
         const indicators = [
-            '.loading-indicator',
-            '[progress_bar]',
             'mat-progress-bar',
             '.generating-text',
-            '.stop-button-container', // 如果有停止按钮
             '[aria-label="Stop generating"]',
-            'button[aria-label="Stop"]'
+            'button[aria-label="Stop"]',
+            '.run-button.stop',
+            '.loading-indicator'
         ];
 
         for (const selector of indicators) {
@@ -220,11 +192,10 @@ class GeminiAdapter extends BaseAdapter {
 
         return false;
     }
-
 }
 
 // 注册适配器
 if (typeof window !== 'undefined') {
-    window.GeminiAdapter = GeminiAdapter;
-    window.currentAdapter = new GeminiAdapter();
+    window.AIStudioAdapter = AIStudioAdapter;
+    window.currentAdapter = new AIStudioAdapter();
 }

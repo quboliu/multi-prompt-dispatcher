@@ -153,7 +153,11 @@
 
     async function scanAndRefresh() {
         try {
-            const response = await chrome.runtime.sendMessage({ type: 'SCAN_TABS' });
+            const currentWindow = await chrome.windows.getCurrent();
+            const response = await chrome.runtime.sendMessage({
+                type: 'SCAN_TABS',
+                windowId: currentWindow.id
+            });
             if (response && response.success) {
                 activeTabs = response.tabs || [];
                 renderGrid();

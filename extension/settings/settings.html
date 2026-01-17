@@ -17,13 +17,22 @@
         <main class="settings-content">
             <!-- Dashboard Settings -->
             <section class="settings-section">
-                <h2>Dashboard</h2>
+                <h2>Dashboard & Detection</h2>
                 <div class="setting-item">
                     <label>
                         <input type="checkbox" id="reuseDashboardTab" checked>
                         <span>Reuse existing dashboard tab</span>
                     </label>
-                    <p class="setting-description">When enabled, clicking "打开指挥中心" will jump to an existing dashboard tab instead of creating a new one.</p>
+                    <p class="setting-description">When enabled, clicking "打开指挥中心" will jump to an existing dashboard
+                        tab instead of creating a new one.</p>
+                </div>
+                <div class="setting-item">
+                    <label>
+                        <input type="checkbox" id="scanCurrentWindowOnly">
+                        <span>Current Window Only</span>
+                    </label>
+                    <p class="setting-description">When enabled, the extension will only detect and display models from
+                        the current window.</p>
                 </div>
             </section>
 

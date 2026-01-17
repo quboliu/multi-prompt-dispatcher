@@ -8,7 +8,8 @@ const SUPPORTED_PATTERNS = [
     // 国际平台
     { pattern: /^https:\/\/(chat\.openai\.com|chatgpt\.com)/, name: 'chatgpt', displayName: 'ChatGPT', icon: '💚' },
     { pattern: /^https:\/\/claude\.ai/, name: 'claude', displayName: 'Claude', icon: '🧡' },
-    { pattern: /^https:\/\/(gemini\.google\.com|aistudio\.google\.com)/, name: 'gemini', displayName: 'Gemini', icon: '💙' },
+    { pattern: /^https:\/\/gemini\.google\.com/, name: 'gemini', displayName: 'Gemini', icon: '💙' },
+    { pattern: /^https:\/\/aistudio\.google\.com/, name: 'aistudio', displayName: 'Google AI Studio', icon: '🛠️' },
     { pattern: /^https:\/\/(grok\.com|grok\.x\.ai|x\.com)/, name: 'grok', displayName: 'Grok', icon: '🖤' },
 
     // 国内平台
@@ -52,10 +53,15 @@ function matchPlatform(url) {
 
 /**
  * 扫描所有标签页，找出 LLM 平台
+ * @param {object} filterOptions 过滤选项
  * @returns {Promise<Array>}
  */
-async function scanTabs() {
-    const tabs = await chrome.tabs.query({});
+async function scanTabs(filterOptions = {}) {
+    const queryOptions = {};
+    if (filterOptions.windowId) {
+        queryOptions.windowId = filterOptions.windowId;
+    }
+    const tabs = await chrome.tabs.query(queryOptions);
     const llmTabs = [];
 
     for (const tab of tabs) {
@@ -169,14 +175,28 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     switch (message.type) {
         case 'SCAN_TABS':
             // 扫描所有 LLM 标签页
-            scanTabs()
-                .then(tabs => {
+            (async () => {
+                const settings = await chrome.storage.sync.get({ scanCurrentWindowOnly: false });
+                const filterOptions = {};
+
+                if (settings.scanCurrentWindowOnly) {
+                    // 如果开启了只检测当前窗口，且消息中带了 windowId，则使用它
+                    if (message.windowId) {
+                        filterOptions.windowId = message.windowId;
+                    } else if (sender.tab) {
+                        // 如果是从标签页（如 Dashboard）发来的，使用该标签页的 windowId
+                        filterOptions.windowId = sender.tab.windowId;
+                    }
+                }
+
+                try {
+                    const tabs = await scanTabs(filterOptions);
                     sendResponse({ success: true, tabs });
-                })
-                .catch(error => {
+                } catch (error) {
                     const msg = (error && error.message) ? error.message : String(error);
                     sendResponse({ success: false, error: msg });
-                });
+                }
+            })();
             return true;
 
         case 'SEND_PROMPT_TO_TABS':

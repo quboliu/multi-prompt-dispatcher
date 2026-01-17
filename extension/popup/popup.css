@@ -104,6 +104,22 @@ h2 {
   font-size: 0.8em;
 }
 
+.text-link-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-dim);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 0.75em;
+  text-decoration: underline;
+  padding: 2px 4px;
+}
+
+.text-link-btn:hover {
+  color: var(--text);
+  background: #f0f0f0;
+}
+
 /* Pin Button */
 #pinBtn {
   font-size: 1.0em;

@@ -130,12 +130,23 @@
     },
     {
       "matches": [
-        "https://gemini.google.com/*",
-        "https://aistudio.google.com/*"
+        "https://gemini.google.com/*"
       ],
       "js": [
         "content/adapters/base.js",
         "content/adapters/gemini.js",
+        "content/content.js"
+      ],
+      "run_at": "document_idle",
+      "world": "MAIN"
+    },
+    {
+      "matches": [
+        "https://aistudio.google.com/*"
+      ],
+      "js": [
+        "content/adapters/base.js",
+        "content/adapters/aistudio.js",
         "content/content.js"
       ],
       "run_at": "document_idle",

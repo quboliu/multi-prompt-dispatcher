@@ -4,6 +4,7 @@
 
     // DOM elements
     const reuseDashboardTabCheckbox = document.getElementById('reuseDashboardTab');
+    const scanCurrentWindowOnlyCheckbox = document.getElementById('scanCurrentWindowOnly');
     const enableHistoryCheckbox = document.getElementById('enableHistory');
     const maxHistoryEntriesInput = document.getElementById('maxHistoryEntries');
     const exportHistoryBtn = document.getElementById('exportHistoryBtn');
@@ -15,6 +16,7 @@
     // Default settings
     const DEFAULT_SETTINGS = {
         reuseDashboardTab: true,
+        scanCurrentWindowOnly: false,
         enableHistory: true,
         maxHistoryEntries: 100
     };
@@ -32,6 +34,7 @@
         try {
             const result = await chrome.storage.sync.get(DEFAULT_SETTINGS);
             reuseDashboardTabCheckbox.checked = result.reuseDashboardTab;
+            scanCurrentWindowOnlyCheckbox.checked = result.scanCurrentWindowOnly;
             enableHistoryCheckbox.checked = result.enableHistory;
             maxHistoryEntriesInput.value = result.maxHistoryEntries;
         } catch (error) {
@@ -44,6 +47,7 @@
     async function saveSettings() {
         const settings = {
             reuseDashboardTab: reuseDashboardTabCheckbox.checked,
+            scanCurrentWindowOnly: scanCurrentWindowOnlyCheckbox.checked,
             enableHistory: enableHistoryCheckbox.checked,
             maxHistoryEntries: parseInt(maxHistoryEntriesInput.value)
         };
