@@ -24,6 +24,7 @@
     "https://chat.deepseek.com/*",
     "https://tongyi.aliyun.com/*",
     "https://qianwen.aliyun.com/*",
+    "https://chat.qwen.ai/*",
     "https://www.doubao.com/*",
     "https://doubao.com/*",
     "https://chatglm.cn/*",
@@ -63,6 +64,7 @@
         "https://chat.deepseek.com/*",
         "https://tongyi.aliyun.com/*",
         "https://qianwen.aliyun.com/*",
+        "https://chat.qwen.ai/*",
         "https://www.doubao.com/*",
         "https://doubao.com/*",
         "https://chatglm.cn/*",
@@ -101,6 +103,7 @@
         "https://chat.deepseek.com/*",
         "https://tongyi.aliyun.com/*",
         "https://qianwen.aliyun.com/*",
+        "https://chat.qwen.ai/*",
         "https://www.doubao.com/*",
         "https://doubao.com/*",
         "https://chatglm.cn/*",
@@ -158,6 +161,33 @@
       "js": [
         "content/adapters/base.js",
         "content/adapters/grok.js",
+        "content/content.js"
+      ],
+      "run_at": "document_idle",
+      "world": "MAIN"
+    },
+    {
+      "matches": [
+        "https://www.doubao.com/*",
+        "https://doubao.com/*"
+      ],
+      "js": [
+        "content/adapters/base.js",
+        "content/adapters/doubao.js",
+        "content/content.js"
+      ],
+      "run_at": "document_idle",
+      "world": "MAIN"
+    },
+    {
+      "matches": [
+        "https://tongyi.aliyun.com/*",
+        "https://qianwen.aliyun.com/*",
+        "https://chat.qwen.ai/*"
+      ],
+      "js": [
+        "content/adapters/base.js",
+        "content/adapters/qwen.js",
         "content/content.js"
       ],
       "run_at": "document_idle",

@@ -200,8 +200,8 @@
         qwen: {
             name: 'Qwen',
             icon: '💜',
-            hostPatterns: ['tongyi.aliyun.com', 'qianwen.aliyun.com'],
-            apiPatterns: ['/api/v2/chat/', '/dialog/conversation'],
+            hostPatterns: ['tongyi.aliyun.com', 'qianwen.aliyun.com', 'chat.qwen.ai'],
+            apiPatterns: ['/api/v2/chat/', '/dialog/conversation', '/api/chat/'],
             parseResponse: (json) => {
                 // 通义千问格式
                 if (json.content) {

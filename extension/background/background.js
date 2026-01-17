@@ -13,7 +13,7 @@ const SUPPORTED_PATTERNS = [
 
     // 国内平台
     { pattern: /^https:\/\/chat\.deepseek\.com/, name: 'deepseek', displayName: 'DeepSeek', icon: '🔵' },
-    { pattern: /^https:\/\/(tongyi\.aliyun\.com|qianwen\.aliyun\.com)/, name: 'qwen', displayName: '通义千问', icon: '💜' },
+    { pattern: /^https:\/\/(tongyi\.aliyun\.com|qianwen\.aliyun\.com|chat\.qwen\.ai)/, name: 'qwen', displayName: '通义千问', icon: '💜' },
     { pattern: /^https:\/\/(www\.)?doubao\.com/, name: 'doubao', displayName: '豆包', icon: '🟠' },
     { pattern: /^https:\/\/(chatglm\.cn|zhipuai\.cn)/, name: 'glm', displayName: '智谱清言', icon: '🟢' },
     { pattern: /^https:\/\/hailuoai\.com/, name: 'minimax', displayName: 'MiniMax', icon: '🐚' },
