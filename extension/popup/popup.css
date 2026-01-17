@@ -19,7 +19,9 @@ body {
   font-family: "Courier New", Courier, monospace;
   background: var(--bg);
   color: var(--text);
-  line-height: 1.1;
+  line-height: 1.5;
+  font-weight: 500;
+  font-size: 14px;
   padding: 15px;
 }
 
@@ -63,15 +65,20 @@ body {
   font-weight: bold;
 }
 
+.subtitleh1 {
+  font-size: 1.3em;
+  font-weight: 700;
+}
+
 .subtitle {
   font-size: 0.8em;
   color: var(--text-dim);
 }
 
-section h2 {
-  font-size: 0.9em;
-  font-weight: bold;
-  margin-bottom: 5px;
+h2 {
+  font-size: 1em;
+  font-weight: 700;
+  margin-bottom: 10px;
   text-transform: uppercase;
 }
 

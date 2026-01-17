@@ -9,7 +9,7 @@ const SUPPORTED_PATTERNS = [
     { pattern: /^https:\/\/(chat\.openai\.com|chatgpt\.com)/, name: 'chatgpt', displayName: 'ChatGPT', icon: '💚' },
     { pattern: /^https:\/\/claude\.ai/, name: 'claude', displayName: 'Claude', icon: '🧡' },
     { pattern: /^https:\/\/(gemini\.google\.com|aistudio\.google\.com)/, name: 'gemini', displayName: 'Gemini', icon: '💙' },
-    { pattern: /^https:\/\/(grok\.x\.ai|x\.com)/, name: 'grok', displayName: 'Grok', icon: '🖤' },
+    { pattern: /^https:\/\/(grok\.com|grok\.x\.ai|x\.com)/, name: 'grok', displayName: 'Grok', icon: '🖤' },
 
     // 国内平台
     { pattern: /^https:\/\/chat\.deepseek\.com/, name: 'deepseek', displayName: 'DeepSeek', icon: '🔵' },

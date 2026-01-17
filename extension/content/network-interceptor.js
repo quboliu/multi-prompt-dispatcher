@@ -158,7 +158,7 @@
         grok: {
             name: 'Grok',
             icon: '🖤',
-            hostPatterns: ['grok.x.ai', 'x.com'],
+            hostPatterns: ['grok.com', 'grok.x.ai', 'x.com'],
             apiPatterns: ['/api/rpc/', '/grok/'],
             parseResponse: (json) => {
                 // Grok 格式推测
