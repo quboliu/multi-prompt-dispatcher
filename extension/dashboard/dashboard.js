@@ -12,6 +12,7 @@
     const groupToggle = document.getElementById('groupToggle');
     const refreshBtn = document.getElementById('refreshBtn');
     const fullscreenBtn = document.getElementById('fullscreenBtn');
+    const settingsBtn = document.getElementById('settingsBtn');
 
     // Sidebar Elements
     const appContainer = document.getElementById('app-container');
@@ -45,6 +46,7 @@
         groupToggle.addEventListener('change', renderGrid);
         refreshBtn.addEventListener('click', scanAndRefresh);
         fullscreenBtn.addEventListener('click', toggleFullscreen);
+        settingsBtn.addEventListener('click', () => chrome.runtime.openOptionsPage());
 
         // Sidebar events
         sidebarPosSelect.addEventListener('change', (e) => setSidebarPosition(e.target.value));

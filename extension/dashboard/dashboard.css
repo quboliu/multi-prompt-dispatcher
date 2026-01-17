@@ -249,6 +249,10 @@ body {
     display: none;
 }
 
+#settingsBtn::before {
+    content: "[SETTINGS]";
+}
+
 #refreshBtn::before {
     content: "[REFRESH]";
 }

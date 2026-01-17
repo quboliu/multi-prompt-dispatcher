@@ -155,6 +155,22 @@ section h2 {
   background: #e8e8e8;
 }
 
+.refresh-tab-btn {
+  background: transparent;
+  border: 1px solid var(--border);
+  cursor: pointer;
+  padding: 2px 8px;
+  font-size: 1em;
+  font-family: inherit;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.refresh-tab-btn:hover {
+  background: #000;
+  color: #fff;
+}
+
 .target-checkbox {
   width: 12px;
   height: 12px;

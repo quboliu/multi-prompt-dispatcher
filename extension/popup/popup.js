@@ -15,12 +15,14 @@
     const resultsList = document.getElementById('resultsList');
     const dashboardBtn = document.getElementById('dashboardBtn');
     const pinBtn = document.getElementById('pinBtn');
+    const settingsBtn = document.getElementById('settingsBtn');
     const container = document.querySelector('.container');
 
     // 状态
     let availableTabs = [];
     let selectedTabIds = new Set();
     let newContentTabs = new Map(); // Track new content count per tab (tabId -> count)
+    let tabReadyCache = new Map(); // Cache tab ready status (tabId -> { ready: boolean, timestamp: number })
     // Check if running in a popup (vs Side Panel or Tab)
     const isPopup = chrome.extension.getViews({ type: 'popup' }).includes(window);
 
@@ -48,11 +50,29 @@
         promptInput.addEventListener('input', savePromptInput); // Auto-save on input
         pinBtn.addEventListener('click', handlePinAction);
 
-        // 打开 Dashboard
-        dashboardBtn.addEventListener('click', () => {
-            chrome.tabs.create({
-                url: chrome.runtime.getURL('dashboard/dashboard.html')
-            });
+        // 打开设置页面
+        settingsBtn.addEventListener('click', () => {
+            chrome.runtime.openOptionsPage();
+        });
+
+        // 打开 Dashboard（支持标签页复用）
+        dashboardBtn.addEventListener('click', async () => {
+            const settings = await chrome.storage.sync.get({ reuseDashboardTab: true });
+            const dashboardUrl = chrome.runtime.getURL('dashboard/dashboard.html');
+
+            if (settings.reuseDashboardTab) {
+                // 查找已存在的 dashboard 标签页
+                const tabs = await chrome.tabs.query({ url: dashboardUrl });
+                if (tabs.length > 0) {
+                    // 跳转到已存在的标签页
+                    await chrome.tabs.update(tabs[0].id, { active: true });
+                    await chrome.windows.update(tabs[0].windowId, { focused: true });
+                    return;
+                }
+            }
+
+            // 创建新标签页
+            chrome.tabs.create({ url: dashboardUrl });
         });
     }
 
@@ -145,6 +165,28 @@
         targetsList.innerHTML = `<div class="loading" style="color: #ff4b2b;">${message}</div>`;
     }
 
+    // 检查标签页的 content script 是否就绪
+    async function checkTabReady(tabId, useCache = true) {
+        if (useCache) {
+            const cached = tabReadyCache.get(tabId);
+            // 缓存 5 秒内有效
+            if (cached && Date.now() - cached.timestamp < 5000) {
+                return cached.ready;
+            }
+        }
+
+        // 实际检测
+        try {
+            const response = await chrome.tabs.sendMessage(tabId, { type: 'PING' });
+            const ready = response?.success === true;
+            tabReadyCache.set(tabId, { ready, timestamp: Date.now() });
+            return ready;
+        } catch (error) {
+            tabReadyCache.set(tabId, { ready: false, timestamp: Date.now() });
+            return false;
+        }
+    }
+
     // 渲染目标列表
     async function renderTargets() {
         if (availableTabs.length === 0) {
@@ -167,9 +209,14 @@
             console.error('[Popup] Failed to get active tab:', error);
         }
 
-        targetsList.innerHTML = availableTabs.map(tab => {
+        // Check ready status for all tabs in parallel
+        const readyStatusPromises = availableTabs.map(tab => checkTabReady(tab.tabId));
+        const readyStatuses = await Promise.all(readyStatusPromises);
+
+        targetsList.innerHTML = availableTabs.map((tab, index) => {
             const newContentCount = newContentTabs.get(tab.tabId) || 0;
             const isActive = tab.tabId === activeTabId;
+            const isReady = readyStatuses[index];
             return `
       <div class="target-item selected ${isActive ? 'active-tab' : ''}" data-tab-id="${tab.tabId}">
         <div class="target-checkbox"></div>
@@ -181,6 +228,7 @@
           </div>
           <div class="target-title">${tab.title || 'Loading...'}</div>
         </div>
+        ${!isReady ? '<button class="refresh-tab-btn" data-tab-id="' + tab.tabId + '" title="刷新页面">⟳</button>' : ''}
       </div>
     `;
         }).join('');
@@ -189,6 +237,7 @@
         targetsList.querySelectorAll('.target-item').forEach(item => {
             const checkbox = item.querySelector('.target-checkbox');
             const targetInfo = item.querySelector('.target-info');
+            const refreshBtn = item.querySelector('.refresh-tab-btn');
             const tabId = parseInt(item.dataset.tabId);
 
             // Checkbox area toggles selection
@@ -202,6 +251,14 @@
                 e.stopPropagation();
                 navigateToTab(tabId);
             });
+
+            // Refresh button refreshes the tab
+            if (refreshBtn) {
+                refreshBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    refreshTab(tabId);
+                });
+            }
         });
 
         updateSendButton();
@@ -218,6 +275,24 @@
             item.classList.add('selected');
         }
         updateSendButton();
+    }
+
+    // 刷新指定标签页
+    async function refreshTab(tabId) {
+        try {
+            // Clear cache for this tab
+            tabReadyCache.delete(tabId);
+
+            // Reload the tab
+            await chrome.tabs.reload(tabId);
+
+            // Wait a bit and re-render
+            setTimeout(() => {
+                renderTargets();
+            }, 1000);
+        } catch (error) {
+            console.error('[Popup] Failed to refresh tab:', error);
+        }
     }
 
     // 更新字符计数
@@ -240,6 +315,26 @@
     async function sendToAll() {
         const prompt = promptInput.value.trim();
         if (!prompt || selectedTabIds.size === 0) return;
+
+        // 检查所有选中的模型是否就绪
+        const readyStatusPromises = Array.from(selectedTabIds).map(async (tabId) => ({
+            tabId,
+            ready: await checkTabReady(tabId, false) // 不使用缓存，实时检测
+        }));
+
+        const readyStatuses = await Promise.all(readyStatusPromises);
+        const notReady = readyStatuses.filter(s => !s.ready);
+
+        // 如果有未就绪的模型，阻止发送并提示
+        if (notReady.length > 0) {
+            const names = notReady.map(s => {
+                const tab = availableTabs.find(t => t.tabId === s.tabId);
+                return tab?.displayName || 'Unknown';
+            }).join(', ');
+
+            showError(`以下模型未就绪，请点击刷新按钮：${names}`);
+            return;
+        }
 
         sendBtn.classList.add('sending');
         sendBtn.disabled = true;

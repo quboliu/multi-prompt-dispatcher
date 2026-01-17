@@ -11,6 +11,7 @@
     "sidePanel",
     "contextMenus"
   ],
+  "options_page": "settings/settings.html",
   "host_permissions": [
     "https://chat.openai.com/*",
     "https://chatgpt.com/*",

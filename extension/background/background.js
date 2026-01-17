@@ -32,6 +32,9 @@ let sidePanelState = {
     lastWindowId: null                // 记录最后操作的窗口 ID
 };
 
+// Prompt history tracking
+let promptHistory = []; // Array of { timestamp, prompt, targets: [{ tabId, displayName }] }
+
 
 /**
  * 检查 URL 是否匹配支持的平台
@@ -179,12 +182,46 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         case 'SEND_PROMPT_TO_TABS':
             // 向指定标签页发送 prompt
             sendPromptToTabs(message.tabIds, message.prompt)
-                .then(results => {
+                .then(async (results) => {
+                    // Track history if enabled
+                    const settings = await chrome.storage.sync.get({ enableHistory: true, maxHistoryEntries: 100 });
+                    if (settings.enableHistory) {
+                        const targets = message.tabIds.map(tabId => {
+                            const state = tabStates.get(tabId);
+                            return {
+                                tabId,
+                                displayName: state?.displayName || 'Unknown'
+                            };
+                        });
+
+                        promptHistory.unshift({
+                            timestamp: new Date().toISOString(),
+                            prompt: message.prompt,
+                            targets
+                        });
+
+                        // Trim history to max entries
+                        if (promptHistory.length > settings.maxHistoryEntries) {
+                            promptHistory = promptHistory.slice(0, settings.maxHistoryEntries);
+                        }
+                    }
+
                     sendResponse({ success: true, results });
                 })
                 .catch(error => {
                     sendResponse({ success: false, error: error.message });
                 });
+            return true;
+
+        case 'GET_PROMPT_HISTORY':
+            // Get prompt history for export
+            sendResponse({ success: true, history: promptHistory });
+            return true;
+
+        case 'CLEAR_PROMPT_HISTORY':
+            // Clear prompt history
+            promptHistory = [];
+            sendResponse({ success: true });
             return true;
 
         case 'CONTENT_READY':

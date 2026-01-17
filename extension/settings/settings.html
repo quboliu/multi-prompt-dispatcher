@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Settings - Multi-LLM Dispatcher</title>
+    <link rel="stylesheet" href="settings.css">
+</head>
+
+<body>
+    <div class="settings-container">
+        <header class="settings-header">
+            <h1>⚙️ Settings</h1>
+        </header>
+
+        <main class="settings-content">
+            <!-- Dashboard Settings -->
+            <section class="settings-section">
+                <h2>Dashboard</h2>
+                <div class="setting-item">
+                    <label>
+                        <input type="checkbox" id="reuseDashboardTab" checked>
+                        <span>Reuse existing dashboard tab</span>
+                    </label>
+                    <p class="setting-description">When enabled, clicking "打开指挥中心" will jump to an existing dashboard tab instead of creating a new one.</p>
+                </div>
+            </section>
+
+            <!-- Prompt History Settings -->
+            <section class="settings-section">
+                <h2>Prompt History</h2>
+                <div class="setting-item">
+                    <label>
+                        <input type="checkbox" id="enableHistory" checked>
+                        <span>Enable history tracking</span>
+                    </label>
+                    <p class="setting-description">Track all sent prompts with timestamp and target models.</p>
+                </div>
+                <div class="setting-item">
+                    <label>
+                        <span>Maximum history entries:</span>
+                        <input type="number" id="maxHistoryEntries" value="100" min="10" max="1000" step="10">
+                    </label>
+                    <p class="setting-description">Older entries will be removed when limit is reached.</p>
+                </div>
+                <div class="setting-item">
+                    <button id="exportHistoryBtn" class="action-btn">Export History (JSON)</button>
+                    <button id="clearHistoryBtn" class="action-btn secondary">Clear History</button>
+                </div>
+            </section>
+        </main>
+
+        <footer class="settings-footer">
+            <button id="saveBtn" class="primary-btn">Save Settings</button>
+            <button id="resetBtn" class="secondary-btn">Reset to Defaults</button>
+            <div id="statusMessage" class="status-message"></div>
+        </footer>
+    </div>
+
+    <script src="settings.js"></script>
+</body>
+
+</html>

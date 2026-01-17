@@ -1,0 +1,171 @@
+:root {
+    --bg: #ffffff;
+    --text: #000000;
+    --text-dim: #666666;
+    --border: #000000;
+    --accent: #0000ee;
+    --success: #008000;
+    --error: #ff4b2b;
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: "Courier New", Courier, monospace;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.5;
+}
+
+.settings-container {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 40px 20px;
+}
+
+.settings-header {
+    border-bottom: 2px solid var(--border);
+    padding-bottom: 20px;
+    margin-bottom: 40px;
+}
+
+.settings-header h1 {
+    font-size: 2em;
+    font-weight: bold;
+}
+
+.settings-content {
+    margin-bottom: 40px;
+}
+
+.settings-section {
+    margin-bottom: 40px;
+    padding: 20px;
+    border: 1px solid var(--border);
+    background: #fafafa;
+}
+
+.settings-section h2 {
+    font-size: 1.3em;
+    font-weight: bold;
+    margin-bottom: 20px;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 10px;
+}
+
+.setting-item {
+    margin-bottom: 20px;
+}
+
+.setting-item:last-child {
+    margin-bottom: 0;
+}
+
+.setting-item label {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+    font-size: 1em;
+}
+
+.setting-item input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    cursor: pointer;
+}
+
+.setting-item input[type="number"] {
+    width: 100px;
+    padding: 5px;
+    border: 1px solid var(--border);
+    font-family: inherit;
+    font-size: 0.9em;
+    margin-left: 10px;
+}
+
+.setting-description {
+    margin-top: 5px;
+    margin-left: 28px;
+    font-size: 0.85em;
+    color: var(--text-dim);
+}
+
+.action-btn {
+    background: transparent;
+    border: 1px solid var(--border);
+    padding: 8px 16px;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 0.9em;
+    margin-right: 10px;
+}
+
+.action-btn:hover {
+    background: #000;
+    color: #fff;
+}
+
+.action-btn.secondary {
+    color: var(--error);
+    border-color: var(--error);
+}
+
+.action-btn.secondary:hover {
+    background: var(--error);
+    color: #fff;
+}
+
+.settings-footer {
+    border-top: 2px solid var(--border);
+    padding-top: 20px;
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
+.primary-btn {
+    background: #000;
+    color: #fff;
+    border: 1px solid var(--border);
+    padding: 10px 20px;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 1em;
+    font-weight: bold;
+}
+
+.primary-btn:hover {
+    background: #333;
+}
+
+.secondary-btn {
+    background: transparent;
+    border: 1px solid var(--border);
+    padding: 10px 20px;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 1em;
+}
+
+.secondary-btn:hover {
+    background: #f0f0f0;
+}
+
+.status-message {
+    margin-left: auto;
+    font-size: 0.9em;
+    padding: 5px 10px;
+}
+
+.status-message.success {
+    color: var(--success);
+}
+
+.status-message.error {
+    color: var(--error);
+}
