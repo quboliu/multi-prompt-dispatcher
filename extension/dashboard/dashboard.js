@@ -34,10 +34,31 @@
     async function init() {
         setupEventListeners();
         loadSettings();
-        loadHistory();
+        await loadHistory();
         updateLayout();
         await scanAndRefresh();
         setupMessageListener();
+        setupVisibilityListener();
+
+        // 暴露全局处理函数供 background 调用
+        window.handleGlobalStateChange = handleStateChange;
+    }
+
+    // 监听页面可见性变化 - 当页面变为可见时刷新状态
+    function setupVisibilityListener() {
+        window.addEventListener('focus', async () => {
+            console.log('[Dashboard] Window focused, refreshing...');
+            await loadHistory();
+            await scanAndRefresh();
+        });
+
+        document.addEventListener('visibilitychange', async () => {
+            if (document.visibilityState === 'visible') {
+                console.log('[Dashboard] Page became visible, refreshing...');
+                await loadHistory();
+                await scanAndRefresh();
+            }
+        });
     }
 
     // Event Listeners
@@ -101,15 +122,26 @@
         }
     }
 
-    function loadHistory() {
-        const historyJson = localStorage.getItem('promptHistory');
-        if (historyJson) {
-            promptHistory = JSON.parse(historyJson);
-            renderHistory();
+    async function loadHistory() {
+        try {
+            const response = await chrome.runtime.sendMessage({ type: 'GET_GLOBAL_STATE' });
+            if (response?.success && response.state?.promptHistory) {
+                promptHistory = response.state.promptHistory;
+                renderHistory();
+                console.log('[Dashboard] History loaded from global state');
+            }
+        } catch (error) {
+            console.error('[Dashboard] Failed to load history:', error);
+            // Fallback to localStorage
+            const historyJson = localStorage.getItem('promptHistory');
+            if (historyJson) {
+                promptHistory = JSON.parse(historyJson);
+                renderHistory();
+            }
         }
     }
 
-    function saveHistory(text) {
+    async function saveHistory(text) {
         const newItem = {
             timestamp: new Date().toISOString(),
             text: text
@@ -119,7 +151,17 @@
         if (promptHistory.length > 50) {
             promptHistory = promptHistory.slice(0, 50);
         }
-        localStorage.setItem('promptHistory', JSON.stringify(promptHistory));
+
+        // Save to global state
+        try {
+            await chrome.runtime.sendMessage({
+                type: 'SET_GLOBAL_STATE',
+                updates: { promptHistory: promptHistory }
+            });
+        } catch (error) {
+            console.error('[Dashboard] Failed to save history to global state:', error);
+        }
+
         renderHistory();
     }
 
@@ -304,10 +346,26 @@
             if (message.type === 'RESPONSE_UPDATE') {
                 handleResponseUpdate(message.data);
                 sendResponse({ received: true });
+            } else if (message.type === 'STATE_CHANGED') {
+                // 处理全局状态变化
+                handleStateChange(message.state);
+                sendResponse({ received: true });
             }
             // Important: Do not call sendResponse for other messages (like SCAN_TABS)
             // to avoid intercepting messages intended for the background script.
         });
+    }
+
+    // 处理全局状态变化
+    function handleStateChange(newState) {
+        if (!newState) return;
+
+        // 更新历史记录
+        if (newState.promptHistory && newState.promptHistory !== promptHistory) {
+            promptHistory = newState.promptHistory;
+            renderHistory();
+            console.log('[Dashboard] History updated from global state');
+        }
     }
 
     function handleResponseUpdate(data) {

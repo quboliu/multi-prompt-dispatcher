@@ -27,14 +27,114 @@ const tabStates = new Map();
 // Phase 2: 缓存各标签页的最新响应（避免后台标签页延迟问题）
 const responseCache = new Map(); // tabId -> { response, timestamp }
 
-// Side Panel 状态跟踪（方案A：内存状态）
-let sidePanelState = {
-    wasOpenBeforeDashboard: false,  // 在打开 dashboard 前是否打开了 side panel
-    lastWindowId: null                // 记录最后操作的窗口 ID
+// =============================================
+// Global State Manager - 全局状态管理器
+// =============================================
+// 用于跨 popup/side panel/dashboard 同步状态
+
+const DEFAULT_GLOBAL_STATE = {
+    selectedTabIds: [],      // 当前选中的模型标签页
+    promptInput: '',         // 当前输入的 prompt
+    promptHistory: [],       // Prompt 历史记录
+    newContentTabs: {},      // Tab ID -> 新内容计数
+    sidePanelPinned: false   // Side Panel 是否固定打开
 };
 
-// Prompt history tracking
-let promptHistory = []; // Array of { timestamp, prompt, targets: [{ tabId, displayName }] }
+// 内存中的全局状态缓存
+let globalState = { ...DEFAULT_GLOBAL_STATE };
+
+// Side Panel 临时状态（用于 dashboard 自动重开）
+let sidePanelTempState = {
+    wasOpenBeforeDashboard: false,
+    lastWindowId: null
+};
+
+/**
+ * 初始化全局状态 - 从 chrome.storage.local 加载
+ */
+async function initGlobalState() {
+    try {
+        const stored = await chrome.storage.local.get('globalState');
+        if (stored.globalState) {
+            globalState = { ...DEFAULT_GLOBAL_STATE, ...stored.globalState };
+            console.log('[Background] Global state loaded:', globalState);
+        }
+    } catch (error) {
+        console.error('[Background] Failed to load global state:', error);
+    }
+}
+
+/**
+ * 保存全局状态到 chrome.storage.local
+ */
+async function saveGlobalState() {
+    try {
+        await chrome.storage.local.set({ globalState });
+    } catch (error) {
+        console.error('[Background] Failed to save global state:', error);
+    }
+}
+
+/**
+ * 更新全局状态并广播变化
+ * @param {object} updates - 要更新的状态字段
+ * @param {boolean} persist - 是否持久化保存（默认 true）
+ */
+async function updateGlobalState(updates, persist = true) {
+    globalState = { ...globalState, ...updates };
+
+    if (persist) {
+        await saveGlobalState();
+    }
+
+    // 广播状态变化到所有 UI 页面
+    broadcastStateChange();
+}
+
+/**
+ * 广播状态变化到所有 UI 页面
+ * 使用多种方式确保消息到达
+ */
+async function broadcastStateChange() {
+    const message = { type: 'STATE_CHANGED', state: globalState };
+
+    console.log('[Background] Broadcasting state change...');
+
+    // 方法1: 直接访问所有扩展视图并调用其处理函数
+    try {
+        const allViews = chrome.extension.getViews();
+        for (const view of allViews) {
+            try {
+                // 直接调用视图的全局处理函数（如果存在）
+                if (typeof view.handleGlobalStateChange === 'function') {
+                    view.handleGlobalStateChange(globalState);
+                }
+            } catch (e) {
+                console.log('[Background] View broadcast error:', e);
+            }
+        }
+        console.log(`[Background] Direct view broadcast to ${allViews.length} views`);
+    } catch (e) {
+        console.error('[Background] Failed to get views:', e);
+    }
+
+    // 方法2: 广播到所有 dashboard 标签页
+    try {
+        const dashboardUrl = chrome.runtime.getURL('dashboard/dashboard.html');
+        const tabs = await chrome.tabs.query({ url: dashboardUrl });
+        for (const tab of tabs) {
+            chrome.tabs.sendMessage(tab.id, message).catch(() => { });
+        }
+        console.log(`[Background] Dashboard broadcast to ${tabs.length} tabs`);
+    } catch (e) {
+        console.error('[Background] Dashboard broadcast error:', e);
+    }
+
+    console.log('[Background] State broadcast complete');
+}
+
+// 初始化全局状态
+initGlobalState();
 
 
 /**
@@ -214,16 +314,18 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                             };
                         });
 
-                        promptHistory.unshift({
+                        const historyEntry = {
                             timestamp: new Date().toISOString(),
                             prompt: message.prompt,
                             targets
-                        });
+                        };
 
-                        // Trim history to max entries
-                        if (promptHistory.length > settings.maxHistoryEntries) {
-                            promptHistory = promptHistory.slice(0, settings.maxHistoryEntries);
+                        // Update global state with new history entry
+                        let newHistory = [historyEntry, ...globalState.promptHistory];
+                        if (newHistory.length > settings.maxHistoryEntries) {
+                            newHistory = newHistory.slice(0, settings.maxHistoryEntries);
                         }
+                        await updateGlobalState({ promptHistory: newHistory });
                     }
 
                     sendResponse({ success: true, results });
@@ -235,13 +337,15 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
         case 'GET_PROMPT_HISTORY':
             // Get prompt history for export
-            sendResponse({ success: true, history: promptHistory });
+            sendResponse({ success: true, history: globalState.promptHistory });
             return true;
 
         case 'CLEAR_PROMPT_HISTORY':
             // Clear prompt history
-            promptHistory = [];
-            sendResponse({ success: true });
+            (async () => {
+                await updateGlobalState({ promptHistory: [] });
+                sendResponse({ success: true });
+            })();
             return true;
 
         case 'CONTENT_READY':
@@ -320,20 +424,48 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         case 'SET_SIDEPANEL_STATE':
             // Popup 通知 background 即将关闭 side panel
             if (message.wasOpen !== undefined) {
-                sidePanelState.wasOpenBeforeDashboard = message.wasOpen;
-                sidePanelState.lastWindowId = message.windowId;
-                console.log('[Background] Side panel state updated:', sidePanelState);
+                sidePanelTempState.wasOpenBeforeDashboard = message.wasOpen;
+                sidePanelTempState.lastWindowId = message.windowId;
+                console.log('[Background] Side panel temp state updated:', sidePanelTempState);
             }
             sendResponse({ success: true });
             break;
 
         case 'CLEAR_SIDEPANEL_STATE':
             // 用户手动关闭 side panel 时清除状态
-            sidePanelState.wasOpenBeforeDashboard = false;
-            sidePanelState.lastWindowId = null;
-            console.log('[Background] Side panel state cleared');
-            sendResponse({ success: true });
+            (async () => {
+                sidePanelTempState.wasOpenBeforeDashboard = false;
+                sidePanelTempState.lastWindowId = null;
+                await updateGlobalState({ sidePanelPinned: false });
+                console.log('[Background] Side panel state cleared and broadcast');
+                sendResponse({ success: true });
+            })();
+            return true;
+
+        case 'GET_GLOBAL_STATE':
+            // 获取全局状态
+            sendResponse({ success: true, state: globalState });
             break;
+
+        case 'SET_GLOBAL_STATE':
+            // 更新全局状态
+            (async () => {
+                if (message.updates) {
+                    await updateGlobalState(message.updates);
+                    console.log('[Background] Global state updated:', message.updates);
+                }
+                sendResponse({ success: true, state: globalState });
+            })();
+            return true;
+
+        case 'SET_SIDEPANEL_PINNED':
+            // 设置 side panel 固定状态
+            (async () => {
+                await updateGlobalState({ sidePanelPinned: message.pinned });
+                console.log('[Background] Side panel pinned:', message.pinned);
+                sendResponse({ success: true });
+            })();
+            return true;
 
         default:
             sendResponse({ success: false, error: 'Unknown message type' });
@@ -455,15 +587,15 @@ chrome.tabs.onActivated.addListener(async (activeInfo) => {
             // 自动重新打开 side panel 逻辑
             const isDashboard = tab.url.includes('/dashboard/dashboard.html');
 
-            if (!isDashboard && sidePanelState.wasOpenBeforeDashboard) {
+            if (!isDashboard && sidePanelTempState.wasOpenBeforeDashboard) {
                 // 不在 dashboard 页面，且之前打开过 side panel
                 // 自动重新打开 side panel
                 console.log('[Background] Auto-reopening side panel for window:', tab.windowId);
                 try {
                     await chrome.sidePanel.open({ windowId: tab.windowId });
                     // 重新打开后清除状态
-                    sidePanelState.wasOpenBeforeDashboard = false;
-                    sidePanelState.lastWindowId = null;
+                    sidePanelTempState.wasOpenBeforeDashboard = false;
+                    sidePanelTempState.lastWindowId = null;
                 } catch (error) {
                     console.error('[Background] Failed to reopen side panel:', error);
                 }

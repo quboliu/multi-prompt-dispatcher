@@ -29,17 +29,137 @@
 
     // 初始化
     async function init() {
+        // 先加载全局状态
+        await loadGlobalState();
+
         updatePinButton();
-        restorePromptInput(); // Restore saved prompt
         await scanTabs();
         setupEventListeners();
         setupResponseListener();
-        setupTabActivationListener(); // Listen for tab switches
+        setupTabActivationListener();
+        setupStateChangeListener(); // 监听全局状态变化
+        setupVisibilityListener(); // 监听可见性变化，自动刷新
+
+        // 暴露全局处理函数供 background 调用
+        window.handleGlobalStateChange = handleStateChange;
 
         // If in side panel mode, start monitoring for dashboard
         if (!isPopup) {
             startDashboardMonitoring();
+            // 通知 background 已打开 side panel
+            chrome.runtime.sendMessage({ type: 'SET_SIDEPANEL_PINNED', pinned: true });
         }
+    }
+
+    // 监听页面可见性变化 - 当页面变为可见时刷新状态
+    function setupVisibilityListener() {
+        // 页面获得焦点时刷新
+        window.addEventListener('focus', async () => {
+            console.log('[Popup] Window focused, refreshing state...');
+            await loadGlobalState();
+            await scanTabs(); // 也刷新标签页列表
+        });
+
+        // visibilitychange 事件
+        document.addEventListener('visibilitychange', async () => {
+            if (document.visibilityState === 'visible') {
+                console.log('[Popup] Page became visible, refreshing state...');
+                await loadGlobalState();
+                await scanTabs();
+            }
+        });
+    }
+
+    // 加载全局状态
+    async function loadGlobalState() {
+        try {
+            const response = await chrome.runtime.sendMessage({ type: 'GET_GLOBAL_STATE' });
+            if (response?.success && response.state) {
+                // 恢复选中的标签页
+                selectedTabIds = new Set(response.state.selectedTabIds || []);
+                // 恢复新内容计数
+                newContentTabs = new Map(Object.entries(response.state.newContentTabs || {}));
+                // 恢复 prompt 输入
+                if (response.state.promptInput) {
+                    promptInput.value = response.state.promptInput;
+                    updateCharCount();
+                    updateSendButton();
+                }
+                console.log('[Popup] Global state loaded:', response.state);
+            }
+        } catch (error) {
+            console.error('[Popup] Failed to load global state:', error);
+        }
+    }
+
+    // 监听全局状态变化（来自其他 popup/dashboard 的更新）
+    function setupStateChangeListener() {
+        // 监听来自 background 的广播
+        window.addEventListener('message', (event) => {
+            if (event.data?.type === 'STATE_CHANGED') {
+                handleStateChange(event.data.state);
+            }
+        });
+
+        // 也监听 chrome.runtime.onMessage
+        chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+            if (message.type === 'STATE_CHANGED') {
+                handleStateChange(message.state);
+            }
+        });
+    }
+
+    // 处理状态变化
+    function handleStateChange(newState) {
+        if (!newState) return;
+
+        let needsRender = false;
+
+        // 更新选中的标签页
+        if (newState.selectedTabIds) {
+            const newSelected = new Set(newState.selectedTabIds);
+            if (!setsEqual(selectedTabIds, newSelected)) {
+                selectedTabIds = newSelected;
+                needsRender = true;
+            }
+        }
+
+        // 更新 prompt 输入
+        if (newState.promptInput !== undefined && newState.promptInput !== promptInput.value) {
+            promptInput.value = newState.promptInput;
+            updateCharCount();
+            updateSendButton();
+        }
+
+        // 更新新内容计数
+        if (newState.newContentTabs) {
+            newContentTabs = new Map(Object.entries(newState.newContentTabs));
+            needsRender = true;
+        }
+
+        // 更新 pin 状态
+        if (newState.sidePanelPinned !== undefined) {
+            // 如果其他页面 unpin 了 side panel，这里也需要响应
+            if (!newState.sidePanelPinned && !isPopup) {
+                // Side panel 被其他页面关闭了
+                window.close();
+            }
+        }
+
+        if (needsRender) {
+            renderTargets();
+        }
+
+        console.log('[Popup] State updated from broadcast');
+    }
+
+    // 辅助函数：比较两个 Set 是否相等
+    function setsEqual(a, b) {
+        if (a.size !== b.size) return false;
+        for (const item of a) {
+            if (!b.has(item)) return false;
+        }
+        return true;
     }
 
     // 设置事件监听
@@ -91,27 +211,34 @@
         }
     }
 
-    // 保存 Prompt 输入内容
+    // 保存 Prompt 输入内容到全局状态
     function savePromptInput() {
-        try {
-            localStorage.setItem('popup_prompt_input', promptInput.value);
-        } catch (error) {
+        chrome.runtime.sendMessage({
+            type: 'SET_GLOBAL_STATE',
+            updates: { promptInput: promptInput.value }
+        }).catch(error => {
             console.error('[Popup] Failed to save prompt input:', error);
-        }
+        });
     }
 
-    // 恢复 Prompt 输入内容
-    function restorePromptInput() {
-        try {
-            const savedPrompt = localStorage.getItem('popup_prompt_input');
-            if (savedPrompt) {
-                promptInput.value = savedPrompt;
-                updateCharCount();
-                updateSendButton();
-            }
-        } catch (error) {
-            console.error('[Popup] Failed to restore prompt input:', error);
-        }
+    // 保存选中状态到全局
+    function saveSelectedTabIds() {
+        chrome.runtime.sendMessage({
+            type: 'SET_GLOBAL_STATE',
+            updates: { selectedTabIds: Array.from(selectedTabIds) }
+        }).catch(error => {
+            console.error('[Popup] Failed to save selected tabs:', error);
+        });
+    }
+
+    // 保存新内容计数到全局
+    function saveNewContentTabs() {
+        chrome.runtime.sendMessage({
+            type: 'SET_GLOBAL_STATE',
+            updates: { newContentTabs: Object.fromEntries(newContentTabs) }
+        }).catch(error => {
+            console.error('[Popup] Failed to save new content tabs:', error);
+        });
     }
 
     // 处理 Pin/Unpin 点击
@@ -288,6 +415,7 @@
         }
         updateSendButton();
         updateSelectAllButton();
+        saveSelectedTabIds(); // 同步到全局状态
     }
 
     // Toggle Select All / Deselect All
@@ -299,6 +427,7 @@
             // Not all selected, so select all
             selectedTabIds = new Set(availableTabs.map(t => t.tabId));
         }
+        saveSelectedTabIds(); // 同步到全局状态
         renderTargets();
     }
 
@@ -428,6 +557,7 @@
     async function navigateToTab(tabId) {
         // Clear new content indicator for this tab
         newContentTabs.delete(tabId);
+        saveNewContentTabs(); // 同步到全局状态
 
         // Navigate to the tab
         try {
@@ -451,6 +581,7 @@
                     if (data.response.isGenerating === false) {
                         const currentCount = newContentTabs.get(data.tabId) || 0;
                         newContentTabs.set(data.tabId, currentCount + 1);
+                        saveNewContentTabs(); // 同步到全局状态
                         renderTargets(); // Re-render to show indicator
                     }
                 }
