@@ -130,6 +130,15 @@ async function broadcastStateChange() {
         console.error('[Background] Dashboard broadcast error:', e);
     }
 
+    // 方法3: 通用广播 (确保 Side Panel 等能收到)
+    try {
+        chrome.runtime.sendMessage(message).catch(() => {
+            // 如果没有接收者（例如没有打开的 popup/sidepanel），这里会报错，可以忽略
+        });
+    } catch (e) {
+        // Ignore
+    }
+
     console.log('[Background] State broadcast complete');
 }
 
@@ -432,12 +441,18 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             break;
 
         case 'CLEAR_SIDEPANEL_STATE':
-            // 用户手动关闭 side panel 时清除状态
+        case 'CLOSE_ALL_SIDEPANELS':
+            // 用户手动关闭 side panel
             (async () => {
+                // 1. 清除所有状态
                 sidePanelTempState.wasOpenBeforeDashboard = false;
                 sidePanelTempState.lastWindowId = null;
                 await updateGlobalState({ sidePanelPinned: false });
-                console.log('[Background] Side panel state cleared and broadcast');
+                
+                // 2. 强制关闭：通过瞬间禁用所有标签页的 Side Panel 权限来实现
+                console.log('[Background] Force closing all side panels...');
+                await forceCloseAllSidePanels();
+                
                 sendResponse({ success: true });
             })();
             return true;
@@ -561,6 +576,63 @@ async function updateSidePanelState(tabId, url) {
 }
 
 /**
+ * 强制关闭所有侧边栏
+ * 通过先禁用再启用的方式，强制浏览器关闭所有标签页的侧边栏 UI
+ */
+async function forceCloseAllSidePanels() {
+    try {
+        // 1. 获取所有标签页
+        const tabs = await chrome.tabs.query({});
+        
+        // 2. 批量禁用 (这会强制关闭 UI)
+        const disablePromises = tabs.map(tab => 
+            chrome.sidePanel.setOptions({
+                tabId: tab.id,
+                enabled: false
+            }).catch(() => {}) // 忽略错误
+        );
+        
+        // 同时也禁用全局默认
+        disablePromises.push(
+            chrome.sidePanel.setOptions({ enabled: false }).catch(() => {})
+        );
+        
+        await Promise.all(disablePromises);
+        console.log('[Background] All side panels disabled (forced closed)');
+        
+        // 3. 稍等片刻让 UI 反应
+        await new Promise(resolve => setTimeout(resolve, 300));
+        
+        // 4. 恢复启用 (以便下次能打开)，但不自动打开
+        // 注意：我们只恢复那些"应该"被启用的标签页 (非 Dashboard)
+        const enablePromises = tabs.map(tab => {
+            if (tab.url && !tab.url.includes('/dashboard/dashboard.html')) {
+                return chrome.sidePanel.setOptions({
+                    tabId: tab.id,
+                    enabled: true,
+                    path: 'popup/popup.html'
+                }).catch(() => {});
+            }
+            return Promise.resolve();
+        });
+        
+        // 恢复全局默认
+        enablePromises.push(
+            chrome.sidePanel.setOptions({ 
+                enabled: true, 
+                path: 'popup/popup.html' 
+            }).catch(() => {})
+        );
+        
+        await Promise.all(enablePromises);
+        console.log('[Background] Side panel permissions restored');
+        
+    } catch (error) {
+        console.error('[Background] Error in forceCloseAllSidePanels:', error);
+    }
+}
+
+/**
  * 初始化：遍历所有标签页设置正确的侧边栏状态
  */
 async function initSidePanelState() {
@@ -592,6 +664,8 @@ chrome.tabs.onActivated.addListener(async (activeInfo) => {
                 // 自动重新打开 side panel
                 console.log('[Background] Auto-reopening side panel for window:', tab.windowId);
                 try {
+                    // Ensure state is synced
+                    await updateGlobalState({ sidePanelPinned: true });
                     await chrome.sidePanel.open({ windowId: tab.windowId });
                     // 重新打开后清除状态
                     sidePanelTempState.wasOpenBeforeDashboard = false;
@@ -650,6 +724,8 @@ chrome.runtime.onInstalled.addListener(() => {
 
 chrome.contextMenus.onClicked.addListener((info, tab) => {
     if (info.menuItemId === 'openSidePanel') {
+        // Explicitly set pinned state
+        updateGlobalState({ sidePanelPinned: true });
         // 打开当前标签页的侧边栏
         chrome.sidePanel.open({ windowId: tab.windowId });
     }

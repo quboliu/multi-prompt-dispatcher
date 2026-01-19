@@ -46,8 +46,8 @@
         // If in side panel mode, start monitoring for dashboard
         if (!isPopup) {
             startDashboardMonitoring();
-            // 通知 background 已打开 side panel
-            chrome.runtime.sendMessage({ type: 'SET_SIDEPANEL_PINNED', pinned: true });
+            // Removed: Auto-pinning on init caused zombie side panels. 
+            // Only explicit user actions should set pinned=true.
         }
     }
 
@@ -244,18 +244,21 @@
     // 处理 Pin/Unpin 点击
     async function handlePinAction() {
         if (isPopup) {
+            // Explicitly set pinned state to true
+            await chrome.runtime.sendMessage({ type: 'SET_SIDEPANEL_PINNED', pinned: true });
+
             // 在 Side Panel 中打开
             const windowObj = await chrome.windows.getCurrent();
             await chrome.sidePanel.open({ windowId: windowObj.id });
             window.close(); // 关闭 Popup
         } else {
             // 用户手动关闭 Side Panel
-            // 通知 background 清除自动重新打开的状态
+            // 通知 background 强制关闭所有 Side Panel
             await chrome.runtime.sendMessage({
-                type: 'CLEAR_SIDEPANEL_STATE'
+                type: 'CLOSE_ALL_SIDEPANELS'
             });
 
-            // 关闭 Side Panel
+            // 关闭当前 Side Panel (虽然 background 会强制关闭，但这里先关为敬)
             window.close();
         }
     }
