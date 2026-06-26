@@ -3,9 +3,9 @@
 # The canonical release path is a version tag matching extension/manifest.json:
 #   git tag v1.1.0 && git push origin v1.1.0
 #
-# The workflow revalidates the extension, builds a clean zip with manifest.json
-# at the package root, and uploads the zip plus SHA-256 checksum to GitHub
-# Releases. Manual runs release the current manifest version.
+# The workflow revalidates the extension, builds a clean zip on the GitHub
+# runner, and publishes the zip plus SHA-256 checksum with the release action.
+# Manual runs release the current manifest version.
 name: Release
 
 on:
@@ -25,8 +25,6 @@ jobs:
     name: Validate / package / publish release
     runs-on: ubuntu-latest
     timeout-minutes: 12
-    env:
-      GH_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -86,13 +84,16 @@ jobs:
             echo 'Download the zip package below, unzip it, and load the unzipped directory from `chrome://extensions/`.'
           } > RELEASE_NOTES.md
 
-      - name: Create or update GitHub Release
-        run: |
-          TAG="${{ steps.version.outputs.tag }}"
-          TITLE="Multi-LLM Prompt Dispatcher ${{ steps.version.outputs.version }}"
-          if gh release view "$TAG" >/dev/null 2>&1; then
-            gh release edit "$TAG" --title "$TITLE" --notes-file RELEASE_NOTES.md
-          else
-            gh release create "$TAG" --title "$TITLE" --notes-file RELEASE_NOTES.md --target "${GITHUB_SHA}"
-          fi
-          gh release upload "$TAG" dist/*.zip dist/*.sha256 --clobber
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          target_commitish: ${{ github.sha }}
+          name: Multi-LLM Prompt Dispatcher ${{ steps.version.outputs.version }}
+          body_path: RELEASE_NOTES.md
+          files: |
+            dist/*.zip
+            dist/*.sha256
+          fail_on_unmatched_files: true
+          overwrite_files: true
+          make_latest: true
