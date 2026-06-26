@@ -1,0 +1,98 @@
+# Release pipeline for Multi-LLM Prompt Dispatcher.
+#
+# The canonical release path is a version tag matching extension/manifest.json:
+#   git tag v1.1.0 && git push origin v1.1.0
+#
+# The workflow revalidates the extension, builds a clean zip with manifest.json
+# at the package root, and uploads the zip plus SHA-256 checksum to GitHub
+# Releases. Manual runs release the current manifest version.
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Validate / package / publish release
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Resolve version and tag
+        id: version
+        run: |
+          VERSION="$(node -e "process.stdout.write(JSON.parse(require('fs').readFileSync('extension/manifest.json', 'utf8')).version)")"
+          if [ "${GITHUB_REF}" != "${GITHUB_REF#refs/tags/}" ]; then
+            TAG="${GITHUB_REF#refs/tags/}"
+          else
+            TAG="v${VERSION}"
+          fi
+          if [ "$TAG" != "v${VERSION}" ]; then
+            echo "::error::tag ${TAG} does not match extension/manifest.json version v${VERSION}"
+            exit 1
+          fi
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+
+      - name: Validate manifest and referenced files
+        run: node scripts/validate-extension.mjs
+
+      - name: JavaScript syntax check
+        run: |
+          find extension scripts -name '*.js' -print0 | xargs -0 -n1 node --check
+
+      - name: Build extension zip
+        run: bash scripts/package-extension.sh
+
+      - name: Verify checksum
+        run: |
+          cd dist
+          sha256sum -c *.sha256
+
+      - name: Assert package contents
+        run: |
+          ZIP="dist/multi-llm-prompt-dispatcher-v${{ steps.version.outputs.version }}.zip"
+          echo "Packaged: ${ZIP} ($(du -h "$ZIP" | cut -f1))"
+          unzip -Z1 "$ZIP" | grep -qx 'manifest.json'
+          unzip -Z1 "$ZIP" | grep -qx 'background/background.js'
+          unzip -Z1 "$ZIP" | grep -qx 'popup/popup.html'
+          unzip -Z1 "$ZIP" | grep -qx 'dashboard/dashboard.html'
+          if unzip -Z1 "$ZIP" | grep -Eq '(^|/)(\.git|node_modules|dist|docs|scripts|\.github)/'; then
+            echo "::error::repository-only files leaked into release package"
+            unzip -Z1 "$ZIP" | grep -E '(^|/)(\.git|node_modules|dist|docs|scripts|\.github)/'
+            exit 1
+          fi
+
+      - name: Create release notes
+        run: |
+          {
+            echo "Multi-LLM Prompt Dispatcher ${{ steps.version.outputs.version }}"
+            echo
+            echo 'Download the zip package below, unzip it, and load the unzipped directory from `chrome://extensions/`.'
+          } > RELEASE_NOTES.md
+
+      - name: Create or update GitHub Release
+        run: |
+          TAG="${{ steps.version.outputs.tag }}"
+          TITLE="Multi-LLM Prompt Dispatcher ${{ steps.version.outputs.version }}"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release edit "$TAG" --title "$TITLE" --notes-file RELEASE_NOTES.md
+          else
+            gh release create "$TAG" --title "$TITLE" --notes-file RELEASE_NOTES.md --target "${GITHUB_SHA}"
+          fi
+          gh release upload "$TAG" dist/*.zip dist/*.sha256 --clobber

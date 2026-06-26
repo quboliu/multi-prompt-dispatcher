@@ -66,7 +66,23 @@ The manifest also reserves host permissions for Zhipu, MiniMax/Hailuo, and Kimi.
 
 ## Installation
 
-This repository is currently distributed as an unpacked Chromium extension.
+This repository is distributed as an unpacked Chromium extension. You can install it from a release zip or from a local checkout.
+
+### From GitHub Releases
+
+1. Download `multi-llm-prompt-dispatcher-vX.Y.Z.zip` from [GitHub Releases](https://github.com/quboliu/multi-prompt-dispatcher/releases).
+2. Unzip the package.
+3. Open the Chromium extension manager:
+
+   ```text
+   chrome://extensions/
+   ```
+
+4. Enable Developer mode.
+5. Select Load unpacked.
+6. Choose the unzipped package directory.
+
+### From Source
 
 1. Clone the repository:
 
@@ -165,11 +181,24 @@ There is no package manager or build pipeline in this repository. Edit files und
 Useful scripts:
 
 ```bash
+node scripts/validate-extension.mjs
+bash scripts/package-extension.sh
 node scripts/diagnostic.js
 node scripts/ai_studio_inspect.js
 ```
 
 Adapter changes should be verified manually against the relevant provider website because provider UI updates can break DOM selectors without any repository change.
+
+## CI and Release Process
+
+CI validates the manifest, checks JavaScript syntax, and uploads a packaged extension artifact on code changes. A weekly package smoke workflow repeats the same release-surface check on a schedule. The release workflow runs on version tags:
+
+```bash
+git tag v1.1.0
+git push origin v1.1.0
+```
+
+The tag must match `extension/manifest.json`. A successful release uploads the extension zip and a SHA-256 checksum to GitHub Releases.
 
 ## Documentation
 

@@ -1,0 +1,47 @@
+# Weekly package smoke test. Flintmark keeps expensive chaos/mutation work out of
+# per-push CI; this repository has no fuzz suite yet, so the scheduled quality
+# pass focuses on the browser-extension release surface: manifest validation,
+# JavaScript syntax, packaging, and checksum verification.
+name: Nightly package smoke
+
+on:
+  schedule:
+    - cron: "0 4 * * 1"
+  workflow_dispatch:
+
+concurrency:
+  group: nightly-smoke-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  package-smoke:
+    name: Validate and package
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Validate manifest and referenced files
+        run: node scripts/validate-extension.mjs
+      - name: JavaScript syntax check
+        run: |
+          find extension scripts -name '*.js' -print0 | xargs -0 -n1 node --check
+      - name: Build extension zip
+        run: bash scripts/package-extension.sh
+      - name: Verify checksum
+        run: |
+          cd dist
+          sha256sum -c *.sha256
+      - name: Upload smoke package
+        uses: actions/upload-artifact@v4
+        with:
+          name: nightly-extension-package
+          path: |
+            dist/*.zip
+            dist/*.sha256
+          retention-days: 14
