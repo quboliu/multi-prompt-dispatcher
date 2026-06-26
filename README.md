@@ -30,6 +30,10 @@ The screenshots below show representative local extension states with sample mod
 
 ![Popup dispatcher with selected model targets](docs/screenshots/popup.png)
 
+### Pinned Side Panel
+
+![Dispatcher pinned to the right Chromium side panel](docs/screenshots/side-panel.png)
+
 ### Command Center
 
 ![Command center showing multiple model response cards](docs/screenshots/dashboard.png)
@@ -129,108 +133,6 @@ Each provider keeps its own native conversation context. The extension synchroni
 | --- | --- |
 | `Ctrl+Shift+M` | Open the extension action popup. |
 | `Alt+Shift+D` | Open the command center. |
-
-## Architecture
-
-```text
-extension/
-  manifest.json
-  background/
-    background.js
-  content/
-    adapters/
-      base.js
-      chatgpt.js
-      claude.js
-      gemini.js
-      aistudio.js
-      grok.js
-      deepseek.js
-      qwen.js
-      doubao.js
-    bridge.js
-    content.js
-    network-interceptor.js
-  popup/
-    popup.html
-    popup.css
-    popup.js
-  dashboard/
-    dashboard.html
-    dashboard.css
-    dashboard.js
-  settings/
-    settings.html
-    settings.css
-    settings.js
-  icons/
-```
-
-Core flow:
-
-1. The background service worker scans tabs and coordinates extension messages.
-2. The popup or command center sends a dispatch request.
-3. A content script selects the matching platform adapter for each target tab.
-4. The adapter fills the provider's web input and triggers the native send action.
-5. The network interceptor and DOM fallback report response updates back to the extension UI.
-
-## Development
-
-There is no package manager or build pipeline in this repository. Edit files under `extension/`, then reload the unpacked extension from `chrome://extensions/`.
-
-Useful scripts:
-
-```bash
-node scripts/validate-extension.mjs
-bash scripts/package-extension.sh
-node scripts/diagnostic.js
-node scripts/ai_studio_inspect.js
-```
-
-Adapter changes should be verified manually against the relevant provider website because provider UI updates can break DOM selectors without any repository change.
-
-## CI and Release Process
-
-CI validates the manifest, checks JavaScript syntax, and uploads a packaged extension artifact on code changes. A weekly package smoke workflow repeats the same release-surface check on a schedule. The release workflow runs on version tags:
-
-```bash
-git tag v1.1.0
-git push origin v1.1.0
-```
-
-The tag must match `extension/manifest.json`. A successful release uploads the extension zip and a SHA-256 checksum to GitHub Releases.
-
-## Documentation
-
-- [Testing guide](docs/TESTING.md)
-- [Phase 2 guide](docs/PHASE2_GUIDE.md)
-- [Adapter architecture](docs/adapters/README.md)
-- [Platform comparison](docs/adapters/platform_comparison.md)
-- [Risk assessment](docs/RISK_ASSESSMENT.md)
-
-## Privacy
-
-- Provider API tokens are not required.
-- Prompt dispatching is performed through the active browser tabs.
-- Settings and prompt history are stored with Chrome extension storage.
-- Conversation content stays in provider web pages unless response monitoring is enabled in the command center.
-
-## Troubleshooting
-
-| Problem | Suggested action |
-| --- | --- |
-| No AI tabs are detected | Refresh the provider page and confirm the URL matches a supported host. |
-| A target tab is not ready | Reload that tab from the popup and wait for the page to finish loading. |
-| Prompt dispatch fails | Check whether the provider is generating, signed out, or has changed its input UI. |
-| Response monitoring is incomplete | Use the provider page directly as the source of truth; monitoring depends on provider transport behavior. |
-
-## Known Limitations
-
-- Provider UI changes can break DOM-based adapters.
-- The user must already be signed in to each provider website.
-- Some providers may block automation-like interactions or change input behavior.
-- Response monitoring support varies by provider and response transport.
-- This repository is not packaged for the Chrome Web Store.
 
 ## Disclaimer
 
